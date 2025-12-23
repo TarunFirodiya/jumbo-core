@@ -47,14 +47,15 @@
 **Goal**: Manage incoming leads and their journey through the sales funnel.
 
 ### 2.1 UI Discovery
-- [ ] Leads List View (`/leads`)
-  - [ ] Table/Kanban view toggle
-  - [ ] Columns: Name, Phone, Source, Status, Assigned Agent, Created
-  - [ ] Filters: Status, Source, Agent, Date Range
-- [ ] Lead Detail View (`/leads/[id]`)
-  - [ ] Profile card with contact info & requirements
-  - [ ] Timeline: Communications, Tasks, Visits
-  - [ ] Quick Actions: Log Call, Send WhatsApp, Create Task
+- [x] Leads List View (`/buyers`)
+  - [x] Table/Kanban view toggle
+  - [x] Columns: Name, Phone, Source, Status, Assigned Agent, Created
+  - [x] Filters: Status, Source, Agent, Date Range
+- [~] Lead Detail View (`/buyers/[id]`)
+  - [x] Profile card with contact info & requirements
+  - [x] Timeline: Communications, Tasks, Visits
+  - [x] Quick Actions: Log Call, Send WhatsApp, Create Task
+  - [ ] **Pending**: Connect to real DB (currently using mocks)
 
 ### 2.2 Schema Updates
 - [x] Verify `communications` table supports call logs and notes
@@ -68,7 +69,7 @@
 
 ### 2.4 API Endpoints
 - [x] `POST /api/v1/leads` — Webhook for Housing.com, MagicBricks
-- [x] `GET /api/v1/leads` — List leads with filters
+- [x] `GET /api/v1/leads` — List leads with filters (Implemented via Page)
 
 ---
 
@@ -84,10 +85,11 @@
   - [ ] Today's tour with waypoint list
   - [ ] Visit card: Property details, customer contact, directions
   - [ ] OTP verification input
+- [~] Visits Management (`/visits`) — General overview (Implemented)
 
 ### 3.2 Schema Updates
-- [ ] Add `otp_verified_at` timestamp to `visits`
-- [ ] Add `agent_notes` to `visits` for field feedback
+- [x] Add `otp_code` and `completed_at` to `visits` (covers `otp_verified_at`)
+- [x] Add `feedback_text` to `visits` (covers `agent_notes`)
 
 ### 3.3 Server Actions
 - [ ] `createTour(data)` — Group visits into a tour
@@ -140,7 +142,7 @@
 ---
 
 ## Current Sprint Focus
-> **Sprint 1**: Inventory Management UI (Phase 1.1)
-> - Listings List View
-> - Create Listing Wizard
-
+> **Sprint 1.5**: Connect UI to Data (Server Actions)
+> - Implement Server Actions for Listings (Create/Update)
+> - Connect Lead Detail View to DB
+> - Implement Server Actions for Leads

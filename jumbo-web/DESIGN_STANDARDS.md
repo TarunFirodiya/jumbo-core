@@ -69,7 +69,8 @@ We use a variable-based radius system to allow global "roundness" adjustments.
 ## 5. Component Architecture
 
 ### UI Components (`src/components/ui`)
-These are low-level, reusable building blocks (Buttons, Inputs, Cards).
+These are low-level, reusable building blocks (Buttons, Inputs, Cards) powered by shadcn/ui.
+- **HARD RULE**: All new UI elements MUST use these pre-built components whenever possible. Do not build custom UI primitives (like modals, dropdowns, or tabs) from scratch.
 - **Do not modify logic**: These should remain purely presentational primitives mostly.
 - **Variants**: Use `class-variance-authority` (cva) to define variants (e.g., `default`, `outline`, `ghost` buttons).
 

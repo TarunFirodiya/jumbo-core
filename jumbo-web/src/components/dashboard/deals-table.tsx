@@ -13,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,7 +124,7 @@ export function DealsTable() {
   };
 
   return (
-    <div className="rounded-xl border bg-card">
+    <Card>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:px-6 sm:py-3.5">
         <div className="flex items-center gap-2 sm:gap-2.5 flex-1">
           <Button variant="outline" size="icon" className="size-7 sm:size-8 shrink-0">
@@ -150,7 +152,10 @@ export function DealsTable() {
               <Button
                 variant="outline"
                 size="sm"
-                className={`h-8 sm:h-9 gap-1.5 sm:gap-2 ${hasActiveFilters ? "border-primary" : ""}`}
+                className={cn(
+                  "h-8 sm:h-9 gap-1.5 sm:gap-2",
+                  hasActiveFilters && "border-primary"
+                )}
               >
                 <Filter className="size-3.5 sm:size-4" />
                 <span className="hidden sm:inline">Filter</span>
@@ -334,7 +339,10 @@ export function DealsTable() {
                   <TableCell>
                     <div className="flex items-center gap-2 sm:gap-2.5">
                       <div
-                        className={`flex items-center justify-center size-5 sm:size-[26px] rounded-md sm:rounded-lg text-white text-[10px] sm:text-sm font-extrabold shrink-0 ${deal.dealColor}`}
+                        className={cn(
+                          "flex items-center justify-center size-5 sm:size-[26px] rounded-md sm:rounded-lg text-white text-[10px] sm:text-sm font-extrabold shrink-0",
+                          deal.dealColor
+                        )}
                       >
                         {deal.dealInitial}
                       </div>
@@ -407,8 +415,9 @@ export function DealsTable() {
               ))
             )}
           </TableBody>
-        </Table>
-      </div>
+          </Table>
+        </div>
+
 
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-6 py-3 border-t">
         <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
@@ -500,6 +509,6 @@ export function DealsTable() {
           </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

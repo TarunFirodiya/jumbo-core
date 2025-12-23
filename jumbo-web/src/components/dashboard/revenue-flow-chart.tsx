@@ -30,6 +30,7 @@ import {
   Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -168,8 +169,9 @@ export function RevenueFlowChart() {
   const totalRevenue = chartData.reduce((acc, item) => acc + item.thisYear, 0);
 
   return (
-    <div className="flex-1 flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 rounded-xl border bg-card min-w-0">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+    <Card className="flex-1 min-w-0">
+      <CardContent className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 h-full">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-2 sm:gap-2.5 flex-1">
           <Button variant="outline" size="icon" className="size-7 sm:size-8">
             <BarChart2 className="size-4 sm:size-[18px] text-muted-foreground" />
@@ -539,6 +541,7 @@ export function RevenueFlowChart() {
           </ResponsiveContainer>
         </div>
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

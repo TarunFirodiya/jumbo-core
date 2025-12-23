@@ -5,14 +5,14 @@ import {
   Calendar as CalendarIcon,
   Search,
   Filter,
-  MoreHorizontal,
+  MoreVertical,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
   Download,
-  MoreVertical,
   Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,114 +43,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const visitsData = [
-  {
-    id: 1,
-    property: {
-      name: "12 Maple Street",
-      address: "Downtown, Apt 4B",
-      image: "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    },
-    dateTime: {
-      date: "Oct 24, 2023",
-      time: "10:00 AM - 10:45 AM",
-    },
-    agent: {
-      name: "Sarah Connor",
-      image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sarah",
-    },
-    client: {
-      name: "John Buyer",
-      type: "Warm Lead",
-    },
-    status: "Scheduled",
-  },
-  {
-    id: 2,
-    property: {
-      name: "88 Park Avenue",
-      address: "Uptown, Villa 12",
-      image: "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    },
-    dateTime: {
-      date: "Oct 24, 2023",
-      time: "02:00 PM - 03:00 PM",
-    },
-    agent: {
-      name: "Mike Ross",
-      image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Mike",
-    },
-    client: {
-      name: "Alice Smith",
-      type: "New Lead",
-    },
-    status: "Pending",
-  },
-  {
-    id: 3,
-    property: {
-      name: "Villa #402",
-      address: "Ocean View Complex",
-      image: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    },
-    dateTime: {
-      date: "Oct 23, 2023",
-      time: "11:00 AM",
-    },
-    agent: {
-      name: "Sarah Connor",
-      image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Sarah",
-    },
-    client: {
-      name: "Bob Jones",
-      type: "Returning",
-    },
-    status: "Completed",
-  },
-  {
-    id: 4,
-    property: {
-      name: "55 Pine Lane",
-      address: "Suburbia, House 5",
-      image: "https://images.unsplash.com/photo-1572120360610-d971b9d7767c?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    },
-    dateTime: {
-      date: "Oct 25, 2023",
-      time: "04:00 PM - 05:00 PM",
-    },
-    agent: {
-      name: "Mike Ross",
-      image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Mike",
-    },
-    client: {
-      name: "Emily Davis",
-      type: "Investor",
-    },
-    status: "Scheduled",
-  },
-  {
-    id: 5,
-    property: {
-      name: "15 Ocean Drive",
-      address: "Waterfront, Condo 9",
-      image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-    },
-    dateTime: {
-      date: "Oct 22, 2023",
-      time: "",
-    },
-    agent: {
-      name: "John Doe",
-      image: "https://api.dicebear.com/9.x/avataaars/svg?seed=John",
-    },
-    client: {
-      name: "Tom Wilson",
-      type: "Cold Lead",
-    },
-    status: "Cancelled",
-  },
-];
+import { visits } from "@/mock-data/visits";
+import { VisitForm } from "@/components/visits/visit-form";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
 
@@ -171,10 +67,53 @@ const getStatusBadgeStyles = (status: string) => {
 export function VisitsTable() {
   const [pageSize, setPageSize] = React.useState(10);
   const [currentPage, setCurrentPage] = React.useState(1);
+  const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [isVisitModalOpen, setIsVisitModalOpen] = React.useState(false);
+
+  const statuses = React.useMemo(() => Array.from(new Set(visits.map((v) => v.status))), []);
+
+  const hasActiveFilters = statusFilter !== "all";
+
+  const filteredVisits = React.useMemo(() => {
+    return visits.filter((visit) => {
+      const matchesSearch =
+        visit.property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        visit.client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        visit.agent.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || visit.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [searchQuery, statusFilter]);
+
+  const totalPages = Math.ceil(filteredVisits.length / pageSize);
+
+  const paginatedVisits = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredVisits.slice(startIndex, startIndex + pageSize);
+  }, [filteredVisits, currentPage, pageSize]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, pageSize]);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setSearchQuery("");
+  };
 
   return (
-    <div className="rounded-xl border bg-card">
+    <Card>
+      <VisitForm 
+        open={isVisitModalOpen} 
+        onOpenChange={setIsVisitModalOpen} 
+      />
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:px-6 sm:py-3.5">
         <div className="flex items-center gap-2 sm:gap-2.5 flex-1">
           <Button variant="outline" size="icon" className="size-7 sm:size-8 shrink-0">
@@ -182,7 +121,7 @@ export function VisitsTable() {
           </Button>
           <span className="text-sm sm:text-base font-medium">All Visits</span>
           <Badge variant="secondary" className="ml-1 text-[10px] sm:text-xs">
-            {visitsData.length}
+            {filteredVisits.length}
           </Badge>
         </div>
 
@@ -191,6 +130,8 @@ export function VisitsTable() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 sm:size-5 text-muted-foreground" />
             <Input
               placeholder="Search visits..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 sm:pl-10 w-full sm:w-[160px] lg:w-[200px] h-8 sm:h-9 text-sm"
             />
           </div>
@@ -200,10 +141,16 @@ export function VisitsTable() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 sm:h-9 gap-1.5 sm:gap-2"
+                className={cn(
+                  "h-8 sm:h-9 gap-1.5 sm:gap-2",
+                  hasActiveFilters && "border-primary text-primary"
+                )}
               >
                 <Filter className="size-3.5 sm:size-4" />
                 <span className="hidden sm:inline">Filter</span>
+                {hasActiveFilters && (
+                  <span className="size-1.5 sm:size-2 rounded-full bg-primary" />
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[200px]">
@@ -212,26 +159,30 @@ export function VisitsTable() {
                 checked={statusFilter === "all"}
                 onCheckedChange={() => setStatusFilter("all")}
               >
-                All Status
+                All Statuses
               </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                 checked={statusFilter === "Scheduled"}
-                 onCheckedChange={() => setStatusFilter("Scheduled")}
-              >
-                Scheduled
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                 checked={statusFilter === "Pending"}
-                 onCheckedChange={() => setStatusFilter("Pending")}
-              >
-                Pending
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                 checked={statusFilter === "Completed"}
-                 onCheckedChange={() => setStatusFilter("Completed")}
-              >
-                Completed
-              </DropdownMenuCheckboxItem>
+              {statuses.map((status) => (
+                <DropdownMenuCheckboxItem
+                  key={status}
+                  checked={statusFilter === status}
+                  onCheckedChange={() => setStatusFilter(status)}
+                >
+                  {status}
+                </DropdownMenuCheckboxItem>
+              ))}
+
+               {hasActiveFilters && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={clearFilters}
+                    className="text-destructive"
+                  >
+                    <X className="size-4 mr-2" />
+                    Clear all filters
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -242,15 +193,32 @@ export function VisitsTable() {
              <span className="hidden sm:inline">Export</span>
            </Button>
 
-           <Button size="sm" className="h-8 sm:h-9 gap-1.5 sm:gap-2 bg-primary">
+           <Button size="sm" className="h-8 sm:h-9 gap-1.5 sm:gap-2 bg-primary" onClick={() => setIsVisitModalOpen(true)}>
              <Plus className="size-3.5 sm:size-4" />
              <span className="hidden sm:inline">New Visit</span>
            </Button>
         </div>
       </div>
 
-      <div className="px-3 sm:px-6 pb-3 sm:pb-4 overflow-x-auto">
-        <Table>
+       {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-6 pb-3">
+          <span className="text-[10px] sm:text-xs text-muted-foreground">Filters:</span>
+          {statusFilter !== "all" && (
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer text-[10px] sm:text-xs h-5 sm:h-6"
+              onClick={() => setStatusFilter("all")}
+            >
+              Status: {statusFilter}
+              <X className="size-2.5 sm:size-3" />
+            </Badge>
+          )}
+        </div>
+      )}
+
+      <CardContent className="p-0">
+        <div className="px-3 sm:px-6 pb-3 sm:pb-4 overflow-x-auto">
+          <Table>
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
               <TableHead className="w-[300px] font-medium text-muted-foreground text-xs sm:text-sm">LISTING PROPERTY</TableHead>
@@ -262,7 +230,14 @@ export function VisitsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visitsData.map((visit) => (
+             {paginatedVisits.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  No visits found matching your filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+            paginatedVisits.map((visit) => (
               <TableRow key={visit.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -336,11 +311,13 @@ export function VisitsTable() {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+          )}
           </TableBody>
-        </Table>
-      </div>
-      
+          </Table>
+        </div>
+      </CardContent>
+
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-6 py-3 border-t">
         <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
           <span className="hidden sm:inline">Rows per page:</span>
@@ -360,28 +337,25 @@ export function VisitsTable() {
             </SelectContent>
           </Select>
           <span className="text-muted-foreground">
-             1-{Math.min(pageSize, visitsData.length)} of {visitsData.length}
+             {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredVisits.length)} of {filteredVisits.length}
           </span>
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" className="size-8" disabled>
+          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(1)} disabled={currentPage === 1}>
             <ChevronsLeft className="size-4" />
           </Button>
-          <Button variant="outline" size="icon" className="size-8" disabled>
+          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
             <ChevronLeft className="size-4" />
           </Button>
-           <Button variant="default" size="icon" className="size-8">
-            1
-          </Button>
-          <Button variant="outline" size="icon" className="size-8" disabled>
+          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>
             <ChevronRight className="size-4" />
           </Button>
-          <Button variant="outline" size="icon" className="size-8" disabled>
+          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages}>
             <ChevronsRight className="size-4" />
           </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

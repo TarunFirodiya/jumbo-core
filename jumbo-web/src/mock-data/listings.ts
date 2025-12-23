@@ -131,6 +131,10 @@ export const mockListings: MockListing[] = Array.from({ length: 50 }, (_, index)
   };
 });
 
+export function getListingById(id: string): MockListing | undefined {
+  return mockListings.find(l => l.id === id);
+}
+
 export function formatINR(amount: number): string {
   if (amount >= 10000000) {
     return `₹${(amount / 10000000).toFixed(2)} Cr`;
@@ -155,4 +159,3 @@ export const statusLabels: Record<ListingStatus, string> = {
   inactive: "Inactive",
   sold: "Sold",
 };
-

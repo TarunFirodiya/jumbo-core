@@ -2,42 +2,50 @@
 
 import { UserCheck, UserPlus, Users, Wallet } from "lucide-react";
 
-const statsData = [
-  {
-    title: "Total Buyers",
-    value: "2,420",
-    change: "+12%",
-    changeValue: "(320)",
-    isPositive: true,
-    icon: Users,
-  },
-  {
-    title: "Active Buyers",
-    value: "845",
-    change: "+8%",
-    changeValue: "(124)",
-    isPositive: true,
-    icon: UserCheck,
-  },
-  {
-    title: "New This Month",
-    value: "156",
-    change: "-5%",
-    changeValue: "(12)",
-    isPositive: false,
-    icon: UserPlus,
-  },
-  {
-    title: "Total Budget",
-    value: "$42M",
-    change: "+15%",
-    changeValue: "($5M)",
-    isPositive: true,
-    icon: Wallet,
-  },
-];
+interface BuyersStatsProps {
+  stats: {
+    totalBuyers: number;
+    activeBuyers: number;
+    newThisMonth: number;
+  };
+}
 
-export function BuyersStats() {
+export function BuyersStats({ stats }: BuyersStatsProps) {
+  const statsData = [
+    {
+      title: "Total Buyers",
+      value: stats.totalBuyers.toLocaleString(),
+      change: "+12%", // Ideally calculate from historical data
+      changeValue: "(320)",
+      isPositive: true,
+      icon: Users,
+    },
+    {
+      title: "Active Buyers",
+      value: stats.activeBuyers.toLocaleString(),
+      change: "+8%",
+      changeValue: "(124)",
+      isPositive: true,
+      icon: UserCheck,
+    },
+    {
+      title: "New This Month",
+      value: stats.newThisMonth.toLocaleString(),
+      change: "-5%",
+      changeValue: "(12)",
+      isPositive: false,
+      icon: UserPlus,
+    },
+    {
+      title: "Total Budget",
+      value: "$42M", // Placeholder as it's hard to sum JSONB without sql cast
+      change: "+15%",
+      changeValue: "($5M)",
+      isPositive: true,
+      icon: Wallet,
+    },
+  ];
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 p-3 sm:p-4 lg:p-6 rounded-xl border bg-card">
       {statsData.map((stat, index) => (
@@ -50,7 +58,8 @@ export function BuyersStats() {
             <p className="text-lg sm:text-xl lg:text-[28px] font-semibold leading-tight tracking-tight">
               {stat.value}
             </p>
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-medium">
+            {/* Keeping the trend UI but static for now as we don't have historical data logic yet */}
+            {/* <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-medium">
               <span
                 className={stat.isPositive ? "text-emerald-600" : "text-red-600"}
               >
@@ -58,7 +67,7 @@ export function BuyersStats() {
                 <span className="hidden sm:inline">{stat.changeValue}</span>
               </span>
               <span className="text-muted-foreground hidden sm:inline">vs Last Months</span>
-            </div>
+            </div> */}
           </div>
           {index < statsData.length - 1 && (
             <div className="hidden lg:block w-px h-full bg-border mx-4 xl:mx-6" />

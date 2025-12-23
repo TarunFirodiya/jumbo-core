@@ -1,0 +1,76 @@
+# Project Rules & Context
+
+## UI Component Standards (HARD RULE)
+- **ALWAYS** use the pre-built shadcn/ui components located in `jumbo-web/src/components/ui/` for any UI element.
+- **DO NOT** create custom UI primitives (like buttons, modals, inputs) from scratch.
+- **CHECK** `jumbo-web/src/components/ui/` first. If a component exists (e.g., `button.tsx`, `dialog.tsx`), import and use it.
+- **ONLY** modify the base components in `src/components/ui` if absolutely necessary for a global style change.
+- When creating feature-specific components (e.g., in `src/components/dashboard`), compose them using these UI primitives.
+
+## Tech Stack
+- **Framework**: Next.js 16 (App Router)
+- **Styling**: Tailwind CSS v4
+- **Icons**: Lucide React
+- **State**: Zustand
+- **Database**: Supabase + Drizzle ORM
+
+## File Structure
+- UI Primitives: `jumbo-web/src/components/ui/`
+- Feature Components: `jumbo-web/src/components/[feature]/`
+- Pages: `jumbo-web/src/app/`
+- Stores: `jumbo-web/src/store/`
+- API Routes: `jumbo-web/src/app/api/`
+- Validations: `jumbo-web/src/lib/validations/`
+- Database: `jumbo-web/src/lib/db/`
+
+## State Management (Zustand)
+- Use Zustand for **global UI state** (filters, wizards, modals, sidebar state).
+- Store files go in `src/store/` with naming convention `[feature]-store.ts`.
+- **ALWAYS** define a TypeScript interface for your store state.
+- Keep stores focused and small; split by feature, not by data type.
+
+```typescript
+// Example pattern:
+interface FeatureStore {
+  // State
+  filterValue: string;
+  // Actions
+  setFilterValue: (value: string) => void;
+}
+
+export const useFeatureStore = create<FeatureStore>((set) => ({
+  filterValue: "",
+  setFilterValue: (value) => set({ filterValue: value }),
+}));
+```
+
+## Data Fetching & Database
+- **Server Components**: Prefer fetching data directly in Server Components for initial page loads. Use `db.query` from Drizzle ORM.
+- **Client Components**: Use API routes (`src/app/api/`) for client-side data mutations and interactions.
+- **Validation**: **ALWAYS** validate API inputs using Zod schemas from `src/lib/validations/`.
+- **ORM**: Use Drizzle ORM (`src/lib/db`) for all database queries. Do not write raw SQL unless absolutely necessary.
+- **Auth**: Use `createClient()` from `@/lib/supabase/server` for server-side auth checks.
+
+## Coding Standards & Naming
+- **Component Exports**: Use `export function ComponentName()` (not `export default`).
+- **File Names**: Use `kebab-case.tsx` for all component files (e.g., `buyers-table.tsx`).
+- **Imports**: **ALWAYS** use `@/` path aliases (e.g., `@/components/ui/button`). Do not use relative imports like `../../`.
+- **Styling**: **ALWAYS** use the `cn()` utility from `@/lib/utils` when merging Tailwind classes.
+- **Icons**: Import icons from `lucide-react`. Use `size-4` (16px) for buttons, `size-5` for navigation.
+
+```typescript
+// Correct import pattern:
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Search } from "lucide-react";
+```
+
+## Feature Structure
+- Keep related code together in feature folders under `src/components/[feature]/`.
+- Each feature folder can contain:
+  - `[feature]-table.tsx` - Data tables
+  - `[feature]-stats.tsx` - Stats/metrics cards
+  - `[feature]-form.tsx` - Forms
+  - `detail/` - Detail view sub-components
+  - `wizard/` - Multi-step wizard components
+- Extract reusable patterns to `src/components/ui/` only if used in 3+ places.

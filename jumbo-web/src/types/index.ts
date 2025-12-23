@@ -29,6 +29,13 @@ export type {
   UserRole,
 } from "@/lib/db/schema";
 
+import { Profile, Lead } from "@/lib/db/schema";
+
+export type LeadWithRelations = Lead & {
+  profile: Profile | null;
+  assignedAgent: Profile | null;
+};
+
 // API Response types
 export interface ApiResponse<T> {
   data: T;

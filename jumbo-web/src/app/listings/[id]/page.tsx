@@ -12,49 +12,62 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
-// Mock Data (Replace with DB fetch later)
-const getListing = async (id: string) => {
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 100));
+import { getListingById } from "@/mock-data/listings";
 
-  return {
-    id: id,
-    status: "active",
-    askingPrice: "15000000",
-    description: "A beautiful 3 BHK apartment in the heart of Indiranagar. Features spacious balconies, modern interiors, and premium amenities. Close to metro station and parks.",
-    images: [
-      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=2070&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?q=80&w=1587&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1484154218962-a1c002085d2f?q=80&w=2071&auto=format&fit=crop"
-    ],
-    amenitiesJson: ["Swimming Pool", "Gym", "24/7 Security", "Power Backup", "Clubhouse", "Children's Play Area"],
+export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const mockListing = getListingById(id);
+
+  if (!mockListing) {
+    return (
+      <SidebarProvider className="bg-sidebar">
+        <DashboardSidebar />
+        <div className="h-svh w-full flex flex-col bg-background">
+          <DashboardHeader />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">Listing not found</h2>
+              <p className="text-muted-foreground">The listing with ID {id} does not exist.</p>
+              <Button asChild className="mt-4">
+                <Link href="/listings">Back to Listings</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  const listing = {
+    id: mockListing.id,
+    status: mockListing.status,
+    askingPrice: mockListing.askingPrice.toString(),
+    description: `A beautiful ${mockListing.bhk} BHK apartment in ${mockListing.buildingName}, ${mockListing.locality}. Features spacious balconies, modern interiors, and premium amenities.`,
+    images: mockListing.images,
+    amenitiesJson: mockListing.amenities,
     unit: {
-      unitNumber: "A-402",
-      floorNumber: 4,
-      bhk: 3,
-      carpetArea: 1850
+      unitNumber: mockListing.unitNumber,
+      floorNumber: mockListing.floorNumber,
+      bhk: mockListing.bhk,
+      carpetArea: mockListing.carpetArea
     },
     building: {
-      name: "Prestige Shantiniketan",
-      locality: "Whitefield",
+      name: mockListing.buildingName,
+      locality: mockListing.locality,
       city: "Bangalore"
     },
     listingAgent: {
-      fullName: "Rahul Dravid",
+      fullName: mockListing.listingAgentName,
       role: "listing_agent",
-      email: "rahul.d@jumbo.com",
+      email: `${mockListing.listingAgentName.toLowerCase().replace(" ", ".")}@jumbo.com`,
       phone: "+91 98765 43210"
     },
     owner: {
-      fullName: "Amitabh Bachchan",
-      email: "amitabh@example.com",
-      phone: "+91 99887 76655"
+      fullName: mockListing.ownerName,
+      email: `${mockListing.ownerName.toLowerCase().replace(" ", ".")}@example.com`,
+      phone: mockListing.ownerPhone
     }
   };
-};
-
-export default async function ListingDetailPage({ params }: { params: { id: string } }) {
-  const listing = await getListing(params.id);
 
   return (
     <SidebarProvider className="bg-sidebar">

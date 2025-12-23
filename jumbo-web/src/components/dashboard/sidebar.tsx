@@ -30,7 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   LayoutGrid,
-  ChartArea,
+  ChartArea, 
   Mail,
   Calendar,
   FileText,
@@ -96,11 +96,6 @@ const menuItems = [
   },
 ];
 
-const folders = [
-  { name: "TechCorp Upgrade", hasNotification: true },
-  { name: "Fintra Expansion", hasNotification: true },
-  { name: "Nova Redesign", hasNotification: true },
-];
 
 export function DashboardSidebar({
   ...props
@@ -116,7 +111,7 @@ export function DashboardSidebar({
           <div className="flex size-5 items-center justify-center rounded bg-gradient-to-b from-black to-[#760000] text-white">
             <Atom className="size-3" />
           </div>
-          <span className="font-semibold text-base sm:text-lg bg-white">Cliento</span>
+          <span className="font-semibold text-base sm:text-lg bg-white">Side By Side</span>
         </div>
       </SidebarHeader>
 
@@ -126,7 +121,7 @@ export function DashboardSidebar({
             <Atom className="size-4 sm:size-5" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-xs sm:text-sm">Synclead</p>
+            <p className="font-semibold text-xs sm:text-sm">Jumbo</p>
             <div className="flex items-center gap-1 text-muted-foreground">
               <Users className="size-3 sm:size-3.5" />
               <span className="text-[10px] sm:text-xs">16 Members</span>
@@ -173,44 +168,7 @@ export function DashboardSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <Collapsible open={foldersOpen} onOpenChange={setFoldersOpen}>
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className="flex items-center justify-between px-0 text-[10px] sm:text-[11px] font-semibold tracking-wider text-muted-foreground">
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center gap-1.5 cursor-pointer">
-                  <ChevronDown
-                    className={`size-3 sm:size-3.5 transition-transform ${
-                      foldersOpen ? "" : "-rotate-90"
-                    }`}
-                  />
-                  FOLDERS
-                </div>
-              </CollapsibleTrigger>
-              <MoreHorizontal className="size-4 cursor-pointer hover:text-foreground transition-colors" />
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu className="mt-2">
-                  {folders.map((folder) => (
-                    <SidebarMenuItem key={folder.name}>
-                      <SidebarMenuButton asChild className="h-9 sm:h-[38px]">
-                        <Link href="#">
-                          <Folder className="size-4 sm:size-5 text-muted-foreground" />
-                          <span className="flex-1 text-muted-foreground text-sm truncate">
-                            {folder.name}
-                          </span>
-                          {folder.hasNotification && (
-                            <div className="size-1.5 rounded-full bg-[#6e3ff3] shrink-0" />
-                          )}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+        
       </SidebarContent>
 
       <SidebarFooter className="px-3 sm:px-4 lg:px-5 pb-3 sm:pb-4 lg:pb-5">
@@ -233,16 +191,7 @@ export function DashboardSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
 
-        <Button variant="outline" className="w-full mt-2" asChild>
-          <Link
-            href="https://square.lndev.me"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Globe className="size-4" />
-            square.lndev.me
-          </Link>
-        </Button>
+       
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

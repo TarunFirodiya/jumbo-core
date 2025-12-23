@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,8 +97,9 @@ export function LeadSourcesChart() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-6 rounded-xl border bg-card w-full xl:w-[410px]">
-      <div className="flex items-center justify-between">
+    <Card className="w-full xl:w-[410px]">
+      <CardContent className="flex flex-col gap-4 p-4 sm:p-6">
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-2.5">
           <Button variant="outline" size="icon" className="size-7 sm:size-8">
             <ChartLine className="size-4 sm:size-[18px] text-muted-foreground" />
@@ -218,6 +220,7 @@ export function LeadSourcesChart() {
         <Settings2 className="size-3" />
         <span>{timeRangeLabels[timeRange]}</span>
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
