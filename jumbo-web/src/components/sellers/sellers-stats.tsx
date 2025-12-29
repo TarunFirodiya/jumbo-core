@@ -1,71 +1,66 @@
 "use client";
 
-import { HandCoins, UserMinus, Users, Building } from "lucide-react";
-
-const statsData = [
-  {
-    title: "Total Sellers",
-    value: "1,850",
-    change: "+9%",
-    changeValue: "(140)",
-    isPositive: true,
-    icon: Users,
-  },
-  {
-    title: "Active Listings",
-    value: "620",
-    change: "+12%",
-    changeValue: "(85)",
-    isPositive: true,
-    icon: Building,
-  },
-  {
-    title: "Churned Sellers",
-    value: "45",
-    change: "-2%",
-    changeValue: "(3)",
-    isPositive: true,
-    icon: UserMinus,
-  },
-  {
-    title: "Total Inventory Value",
-    value: "$128M",
-    change: "+5%",
-    changeValue: "($6M)",
-    isPositive: true,
-    icon: HandCoins,
-  },
-];
+import { useState, useEffect } from "react";
+import { Users, Building, Calendar, Home, Loader2 } from "lucide-react";
+import { Stats, type StatItem } from "@/components/ui/stats";
+import type { SellerStats } from "@/types";
 
 export function SellersStats() {
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 p-3 sm:p-4 lg:p-6 rounded-xl border bg-card">
-      {statsData.map((stat, index) => (
-        <div key={stat.title} className="flex items-start">
-          <div className="flex-1 space-y-2 sm:space-y-4 lg:space-y-6">
-            <div className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground">
-              <stat.icon className="size-3.5 sm:size-[18px]" />
-              <span className="text-[10px] sm:text-xs lg:text-sm font-medium truncate">{stat.title}</span>
-            </div>
-            <p className="text-lg sm:text-xl lg:text-[28px] font-semibold leading-tight tracking-tight">
-              {stat.value}
-            </p>
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-medium">
-              <span
-                className={stat.isPositive ? "text-emerald-600" : "text-red-600"}
-              >
-                {stat.change}
-                <span className="hidden sm:inline">{stat.changeValue}</span>
-              </span>
-              <span className="text-muted-foreground hidden sm:inline">vs Last Months</span>
-            </div>
-          </div>
-          {index < statsData.length - 1 && (
-            <div className="hidden lg:block w-px h-full bg-border mx-4 xl:mx-6" />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+  const [stats, setStats] = useState<SellerStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const response = await fetch("/api/v1/sellers/stats");
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch seller stats:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-2 text-muted-foreground h-24">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading stats...
+      </div>
+    );
+  }
+
+  const statsData: StatItem[] = [
+    {
+      title: "New Leads",
+      value: String(stats?.newLeads ?? 0),
+      subtitle: "This month",
+      icon: Users,
+    },
+    {
+      title: "Homes Live",
+      value: String(stats?.homesLive ?? 0),
+      subtitle: "This month",
+      icon: Home,
+    },
+    {
+      title: "Schedule Inspections",
+      value: String(stats?.inspectionPending ?? 0),
+      subtitle: "Pending",
+      icon: Calendar,
+    },
+    {
+      title: "Active Sellers",
+      value: String(stats?.activeSellers ?? 0),
+      subtitle: "With live listings",
+      icon: Building,
+    },
+  ];
+
+  return <Stats data={statsData} />;
+}

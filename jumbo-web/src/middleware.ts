@@ -3,7 +3,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import type { UserRole } from "@/lib/db/schema";
 
 // Routes that require authentication
-const PROTECTED_ROUTES = ["/dashboard", "/leads", "/listings", "/tours", "/tasks", "/settings"];
+const PROTECTED_ROUTES = ["/settings"];
 
 // Routes that should redirect to dashboard if already authenticated
 const AUTH_ROUTES = ["/login", "/signup"];
@@ -42,7 +42,7 @@ export async function middleware(request: NextRequest) {
 
   // Redirect authenticated users away from auth routes
   if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   // Check role-based access for authenticated users

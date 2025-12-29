@@ -10,7 +10,7 @@ import {
   type KanbanColumnProps,
   type KanbanItemProps,
 } from "@/components/kibo-ui/kanban";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,7 +173,7 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
                 </div>
               </KanbanHeader>
               <KanbanCards id={column.id}>
-                {(item) => {
+                {(item: KanbanBuyer) => {
                   const lead = item.original;
                   const requirements = lead.requirementJson as any || {};
                   const budget = requirements.budget_max 
@@ -186,6 +186,7 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
                     key={item.id}
                     id={item.id}
                     name={item.name}
+                    column={item.column}
                     className="p-3 space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">

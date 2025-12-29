@@ -149,11 +149,12 @@ export function OffersKanban() {
                 </div>
               </KanbanHeader>
               <KanbanCards id={column.id}>
-                {(item) => (
+                {(item: KanbanOffer) => (
                   <KanbanCard
                     key={item.id}
                     id={item.id}
                     name={item.name}
+                    column={item.column}
                     className="p-3 space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">

@@ -27,14 +27,50 @@ export type {
   CreditLedgerEntry,
   NewCreditLedgerEntry,
   UserRole,
+  SellerLead,
+  NewSellerLead,
+  SellerLeadStatus,
+  SellerLeadSource,
+  AuditLog,
+  NewAuditLog,
+  AuditAction,
 } from "@/lib/db/schema";
 
-import { Profile, Lead } from "@/lib/db/schema";
+import { Profile, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing } from "@/lib/db/schema";
 
 export type LeadWithRelations = Lead & {
   profile: Profile | null;
   assignedAgent: Profile | null;
 };
+
+export type ListingWithRelations = Listing & {
+  unit: (Unit & {
+    building: Building | null;
+  }) | null;
+};
+
+export type SellerLeadWithRelations = SellerLead & {
+  building: Building | null;
+  unit: Unit | null;
+  assignedTo: Profile | null;
+  referredBy: Profile | null;
+  createdBy: Profile | null;
+  communications?: Communication[];
+  tasks?: Task[];
+  listings?: ListingWithRelations[];
+};
+
+export type AuditLogWithRelations = AuditLog & {
+  performedBy: Profile | null;
+};
+
+// Seller stats response
+export interface SellerStats {
+  newLeads: number;
+  homesLive: number;
+  inspectionPending: number;
+  activeSellers: number;
+}
 
 // API Response types
 export interface ApiResponse<T> {
@@ -90,4 +126,3 @@ export type CoinActionType =
   | "missed_visit"
   | "no_followup"
   | "new_listing";
-

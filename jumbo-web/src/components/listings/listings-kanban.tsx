@@ -10,7 +10,6 @@ import {
   type KanbanColumnProps,
   type KanbanItemProps,
 } from "@/components/kibo-ui/kanban";
-import { mockListings, type MockListing, statusLabels, formatINR } from "@/mock-data/listings";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,12 +35,68 @@ import {
   BedDouble,
   Maximize,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatINR } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
+import type { ListingWithRelations } from "@/types";
+
+// Status labels
+const statusLabels: Record<string, string> = {
+  draft: "Draft",
+  inspection_pending: "Inspection Pending",
+  active: "Active",
+  inactive: "Inactive",
+  sold: "Sold",
+};
+
+// Transform DB listing to kanban format
+type KanbanListingData = {
+  id: string;
+  unitNumber: string;
+  buildingName: string;
+  locality: string;
+  bhk: number | null;
+  carpetArea: number | null;
+  floorNumber: number | null;
+  askingPrice: string | null;
+  status: string;
+  listingAgentName: string;
+  listingAgentInitials: string;
+  images: string[];
+};
+
+function transformListingForKanban(listing: ListingWithRelations): KanbanListingData {
+  const unit = listing.unit;
+  const building = unit?.building;
+  const agent = listing.listingAgent;
+  
+  const agentName = agent?.fullName || "Unassigned";
+  const agentInitials = agent?.fullName
+    ? agent.fullName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "??";
+
+  return {
+    id: listing.id,
+    unitNumber: unit?.unitNumber || "N/A",
+    buildingName: building?.name || "Unknown Building",
+    locality: building?.locality || "Unknown",
+    bhk: unit?.bhk || null,
+    carpetArea: unit?.carpetArea || null,
+    floorNumber: unit?.floorNumber || null,
+    askingPrice: listing.askingPrice,
+    status: listing.status || "draft",
+    listingAgentName: agentName,
+    listingAgentInitials: agentInitials,
+    images: Array.isArray(listing.images) ? listing.images : [],
+  };
+}
 
 interface KanbanListing extends KanbanItemProps {
-  original: MockListing;
+  original: KanbanListingData;
+}
+
+interface ListingsKanbanProps {
+  data: ListingWithRelations[];
 }
 
 const COLUMNS: KanbanColumnProps[] = [
@@ -52,17 +107,19 @@ const COLUMNS: KanbanColumnProps[] = [
   { id: "sold", name: "Sold" },
 ];
 
-export function ListingsKanban() {
+export function ListingsKanban({ data }: ListingsKanbanProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
 
+  const transformedData = useMemo(() => data.map(transformListingForKanban), [data]);
+
   const agents = useMemo(() => {
-    const agentSet = new Set(mockListings.map((l) => l.listingAgentName));
+    const agentSet = new Set(transformedData.map((l) => l.listingAgentName));
     return Array.from(agentSet);
-  }, []);
+  }, [transformedData]);
 
   const initialData: KanbanListing[] = useMemo(() => {
-    return mockListings
+    return transformedData
       .filter((listing) => {
         const matchesSearch =
           listing.buildingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -78,7 +135,7 @@ export function ListingsKanban() {
         column: listing.status,
         original: listing,
       }));
-  }, [searchQuery, agentFilter]);
+  }, [transformedData, searchQuery, agentFilter]);
 
   const [tasks, setTasks] = useState<KanbanListing[]>(initialData);
 
@@ -154,21 +211,28 @@ export function ListingsKanban() {
                 </div>
               </KanbanHeader>
               <KanbanCards id={column.id}>
-                {(item) => (
+                {(item: KanbanListing) => (
                   <KanbanCard
                     key={item.id}
                     id={item.id}
                     name={item.name}
+                    column={item.column}
                     className="p-3 space-y-3"
                   >
                     <div className="flex gap-3">
-                        <div className="relative size-16 rounded-md overflow-hidden shrink-0">
-                            <Image
-                                src={item.original.images[0]}
-                                alt={item.original.buildingName}
-                                fill
-                                className="object-cover"
-                            />
+                        <div className="relative size-16 rounded-md overflow-hidden shrink-0 bg-muted">
+                            {item.original.images && item.original.images.length > 0 ? (
+                                <Image
+                                    src={item.original.images[0]}
+                                    alt={item.original.buildingName}
+                                    fill
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                                    No Image
+                                </div>
+                            )}
                         </div>
                         <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-1">
@@ -210,24 +274,30 @@ export function ListingsKanban() {
                                 </span>
                             </div>
                              <div className="font-semibold text-sm mt-1">
-                                {formatINR(item.original.askingPrice)}
+                                {item.original.askingPrice ? formatINR(item.original.askingPrice) : "Price not set"}
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground border-t pt-2">
-                         <div className="flex items-center gap-1">
-                            <BedDouble className="size-3" />
-                            <span>{item.original.bhk} BHK</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <Maximize className="size-3" />
-                            <span>{item.original.carpetArea} sqft</span>
-                        </div>
-                         <div className="flex items-center gap-1">
-                            <Home className="size-3" />
-                            <span>Floor {item.original.floorNumber}</span>
-                        </div>
+                         {item.original.bhk && (
+                            <div className="flex items-center gap-1">
+                                <BedDouble className="size-3" />
+                                <span>{item.original.bhk} BHK</span>
+                            </div>
+                         )}
+                        {item.original.carpetArea && (
+                            <div className="flex items-center gap-1">
+                                <Maximize className="size-3" />
+                                <span>{item.original.carpetArea} sqft</span>
+                            </div>
+                        )}
+                         {item.original.floorNumber && (
+                            <div className="flex items-center gap-1">
+                                <Home className="size-3" />
+                                <span>Floor {item.original.floorNumber}</span>
+                            </div>
+                         )}
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t mt-2">

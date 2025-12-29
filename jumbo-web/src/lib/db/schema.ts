@@ -25,6 +25,30 @@ export const userRoleEnum = pgEnum("user_role", [
   "visit_agent",
   "dispatch_agent",
   "closing_agent",
+  "seller_agent",
+]);
+
+export const sellerLeadStatusEnum = pgEnum("seller_lead_status", [
+  "new",
+  "proposal_sent",
+  "proposal_accepted",
+  "dropped",
+]);
+
+export const sellerLeadSourceEnum = pgEnum("seller_lead_source", [
+  "website",
+  "99acres",
+  "magicbricks",
+  "housing",
+  "nobroker",
+  "mygate",
+  "referral",
+]);
+
+export const auditActionEnum = pgEnum("audit_action", [
+  "create",
+  "update",
+  "delete",
 ]);
 
 // ============================================
@@ -86,12 +110,14 @@ export const listings = pgTable("listings", {
     magicbricks_id?: string;
   }>(),
   isVerified: boolean("is_verified").default(false),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 // ============================================
-// 3. CRM & LEAD MANAGEMENT
+// 3. CRM & LEAD MANAGEMENT (Buyer Leads)
 // ============================================
 
 export const leads = pgTable("leads", {
@@ -113,12 +139,38 @@ export const leads = pgTable("leads", {
 });
 
 // ============================================
+// 3b. CRM & LEAD MANAGEMENT (Seller Leads)
+// ============================================
+
+export const sellerLeads = pgTable("seller_leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  status: sellerLeadStatusEnum("status").default("new"),
+  source: sellerLeadSourceEnum("source").notNull(),
+  sourceUrl: text("source_url"),
+  referredById: uuid("referred_by_id").references(() => profiles.id),
+  buildingId: uuid("building_id").references(() => buildings.id),
+  unitId: uuid("unit_id").references(() => units.id),
+  assignedToId: uuid("assigned_to_id").references(() => profiles.id),
+  followUpDate: timestamp("follow_up_date", { withTimezone: true }),
+  isNri: boolean("is_nri").default(false),
+  notes: text("notes"),
+  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+// ============================================
 // 4. COMMUNICATIONS LOG (WhatsApp & Calls)
 // ============================================
 
 export const communications = pgTable("communications", {
   id: uuid("id").primaryKey().defaultRandom(),
   leadId: uuid("lead_id").references(() => leads.id),
+  sellerLeadId: uuid("seller_lead_id").references(() => sellerLeads.id),
   agentId: uuid("agent_id").references(() => profiles.id),
   channel: text("channel"),
   direction: text("direction"),
@@ -177,6 +229,7 @@ export const tasks = pgTable("tasks", {
   priority: text("priority").default("medium"),
   dueAt: timestamp("due_at", { withTimezone: true }),
   relatedLeadId: uuid("related_lead_id").references(() => leads.id),
+  sellerLeadId: uuid("seller_lead_id").references(() => sellerLeads.id),
   status: text("status").default("open"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -204,6 +257,20 @@ export const creditLedger = pgTable("credit_ledger", {
 });
 
 // ============================================
+// 8. AUDIT LOGS (Timeline/History Tracking)
+// ============================================
+
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  entityType: text("entity_type").notNull(), // seller_lead, listing, visit, lead, etc.
+  entityId: uuid("entity_id").notNull(),
+  action: auditActionEnum("action").notNull(),
+  changes: jsonb("changes").$type<Record<string, { old: unknown; new: unknown }>>(),
+  performedById: uuid("performed_by_id").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// ============================================
 // RELATIONS
 // ============================================
 
@@ -212,16 +279,21 @@ export const profilesRelations = relations(profiles, ({ many }) => ({
   createdListings: many(listings, { relationName: "listingAgent" }),
   assignedLeads: many(leads, { relationName: "assignedAgent" }),
   buyerLeads: many(leads, { relationName: "buyerProfile" }),
+  assignedSellerLeads: many(sellerLeads, { relationName: "assignedAgent" }),
+  referredSellerLeads: many(sellerLeads, { relationName: "referredBy" }),
+  createdSellerLeads: many(sellerLeads, { relationName: "createdBy" }),
   communications: many(communications),
   dispatchedTours: many(visitTours, { relationName: "dispatchAgent" }),
   fieldTours: many(visitTours, { relationName: "fieldAgent" }),
   createdTasks: many(tasks, { relationName: "taskCreator" }),
   assignedTasks: many(tasks, { relationName: "taskAssignee" }),
   creditEntries: many(creditLedger),
+  auditLogs: many(auditLogs),
 }));
 
 export const buildingsRelations = relations(buildings, ({ many }) => ({
   units: many(units),
+  sellerLeads: many(sellerLeads),
 }));
 
 export const unitsRelations = relations(units, ({ one, many }) => ({
@@ -235,6 +307,7 @@ export const unitsRelations = relations(units, ({ one, many }) => ({
     relationName: "unitOwner",
   }),
   listings: many(listings),
+  sellerLeads: many(sellerLeads),
 }));
 
 export const listingsRelations = relations(listings, ({ one, many }) => ({
@@ -270,6 +343,10 @@ export const communicationsRelations = relations(communications, ({ one }) => ({
   lead: one(leads, {
     fields: [communications.leadId],
     references: [leads.id],
+  }),
+  sellerLead: one(sellerLeads, {
+    fields: [communications.sellerLeadId],
+    references: [sellerLeads.id],
   }),
   agent: one(profiles, {
     fields: [communications.agentId],
@@ -321,11 +398,50 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     fields: [tasks.relatedLeadId],
     references: [leads.id],
   }),
+  sellerLead: one(sellerLeads, {
+    fields: [tasks.sellerLeadId],
+    references: [sellerLeads.id],
+  }),
 }));
 
 export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
   agent: one(profiles, {
     fields: [creditLedger.agentId],
+    references: [profiles.id],
+  }),
+}));
+
+export const sellerLeadsRelations = relations(sellerLeads, ({ one, many }) => ({
+  referredBy: one(profiles, {
+    fields: [sellerLeads.referredById],
+    references: [profiles.id],
+    relationName: "referredBy",
+  }),
+  building: one(buildings, {
+    fields: [sellerLeads.buildingId],
+    references: [buildings.id],
+  }),
+  unit: one(units, {
+    fields: [sellerLeads.unitId],
+    references: [units.id],
+  }),
+  assignedTo: one(profiles, {
+    fields: [sellerLeads.assignedToId],
+    references: [profiles.id],
+    relationName: "assignedAgent",
+  }),
+  createdBy: one(profiles, {
+    fields: [sellerLeads.createdById],
+    references: [profiles.id],
+    relationName: "createdBy",
+  }),
+  communications: many(communications),
+  tasks: many(tasks),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  performedBy: one(profiles, {
+    fields: [auditLogs.performedById],
     references: [profiles.id],
   }),
 }));
@@ -367,6 +483,17 @@ export type NewCreditRule = typeof creditRules.$inferInsert;
 export type CreditLedgerEntry = typeof creditLedger.$inferSelect;
 export type NewCreditLedgerEntry = typeof creditLedger.$inferInsert;
 
+export type SellerLead = typeof sellerLeads.$inferSelect;
+export type NewSellerLead = typeof sellerLeads.$inferInsert;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
+
 // Role type for RBAC
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
+
+// Seller Lead Status and Source types
+export type SellerLeadStatus = (typeof sellerLeadStatusEnum.enumValues)[number];
+export type SellerLeadSource = (typeof sellerLeadSourceEnum.enumValues)[number];
+export type AuditAction = (typeof auditActionEnum.enumValues)[number];
 

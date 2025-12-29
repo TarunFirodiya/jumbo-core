@@ -1,19 +1,22 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card } from "@/components/ui/card";
+  MoreHorizontal,
+  Eye,
+  Pencil,
+  Trash2,
+  Loader2,
+  Search,
+  Filter,
+  Globe,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,346 +26,218 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ClipboardList,
-  Search,
-  Filter,
-  MoreHorizontal,
-  Eye,
-  Pencil,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  X,
-  FileSpreadsheet,
-  FileText,
-  Database,
-  FileInput,
-} from "lucide-react";
-import { sellers } from "@/mock-data/sellers";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import type { SellerLeadWithRelations } from "@/types";
+import { sellerLeadStatusOptions } from "@/lib/validations/seller";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 50];
+// Status badge colors
+const statusColors: Record<string, { bg: string; text: string }> = {
+  new: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400" },
+  proposal_sent: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400" },
+  proposal_accepted: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400" },
+  dropped: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400" },
+};
+
+export const columns: ColumnDef<SellerLeadWithRelations>[] = [
+  {
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => (
+      <Link
+        href={`/sellers/${row.original.id}`}
+        className="font-medium truncate hover:underline block w-full"
+      >
+        <div className="flex items-center gap-2">
+          {row.getValue("name") || "Unknown"}
+          {row.original.isNri && (
+            <Globe className="size-3 text-blue-500" />
+          )}
+        </div>
+      </Link>
+    ),
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    cell: ({ row }) => {
+      const status = row.getValue("status") as string;
+      const colors = statusColors[status] || statusColors.new;
+      const label = sellerLeadStatusOptions.find((s) => s.value === status)?.label || status;
+      return (
+        <Badge className={cn(colors.bg, colors.text, "font-medium text-xs whitespace-nowrap")}>
+          {label}
+        </Badge>
+      );
+    },
+  },
+  {
+    id: "building",
+    header: "Building / Unit",
+    cell: ({ row }) => {
+      const building = row.original.building;
+      const unit = row.original.unit;
+      if (!building && !unit) {
+        return <span className="text-muted-foreground">-</span>;
+      }
+      return (
+        <div className="text-sm">
+          <div className="font-medium">{building?.name || "-"}</div>
+          {unit && (
+            <div className="text-xs text-muted-foreground">
+              Unit {unit.unitNumber}
+            </div>
+          )}
+        </div>
+      );
+    },
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone",
+    cell: ({ row }) => (
+      <div className="text-muted-foreground tabular-nums">
+        {row.getValue("phone")}
+      </div>
+    ),
+  },
+  {
+    id: "assignedTo",
+    header: "Assigned To",
+    cell: ({ row }) => {
+      const agent = row.original.assignedTo;
+      if (!agent) {
+        return <span className="text-muted-foreground text-sm">Unassigned</span>;
+      }
+      return (
+        <div className="text-sm">{agent.fullName}</div>
+      );
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => {
+      const lead = row.original;
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/sellers/${lead.id}`} className="cursor-pointer w-full">
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+  },
+];
 
 export function SellersTable() {
+  const [data, setData] = React.useState<SellerLeadWithRelations[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("all");
-  const [agentFilter, setAgentFilter] = React.useState("all");
-  
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const [pageSize, setPageSize] = React.useState(10);
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
-  // Derived state
-  const statuses = React.useMemo(() => Array.from(new Set(sellers.map((s) => s.status))), []);
-  const agents = React.useMemo(() => Array.from(new Set(sellers.map((s) => s.assignedAgent.name))), []);
-  
-  const hasActiveFilters = statusFilter !== "all" || agentFilter !== "all";
-
-  const filteredSellers = React.useMemo(() => {
-    return sellers.filter((seller) => {
-      const matchesSearch =
-        seller.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        seller.email.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus = statusFilter === "all" || seller.status === statusFilter;
-      const matchesAgent = agentFilter === "all" || seller.assignedAgent.name === agentFilter;
-
-      return matchesSearch && matchesStatus && matchesAgent;
-    });
-  }, [searchQuery, statusFilter, agentFilter]);
-
-  const totalPages = Math.ceil(filteredSellers.length / pageSize);
-
-  const paginatedSellers = React.useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredSellers.slice(startIndex, startIndex + pageSize);
-  }, [filteredSellers, currentPage, pageSize]);
+  const fetchSellerLeads = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("search", searchQuery);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      
+      const response = await fetch(`/api/v1/seller-leads?${params.toString()}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("API Error:", response.status, response.statusText, errorData);
+        throw new Error(errorData.message || `Failed to fetch seller leads (${response.status})`);
+      }
+      const result = await response.json();
+      setData(result.data);
+    } catch (error) {
+      console.error("Error fetching seller leads:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to load seller leads");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchQuery, statusFilter]);
 
   React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, agentFilter, pageSize]);
-
-  const goToPage = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  const clearFilters = () => {
-    setStatusFilter("all");
-    setAgentFilter("all");
-    setSearchQuery("");
-  };
+    const debounceTimeout = setTimeout(() => {
+      fetchSellerLeads();
+    }, 300);
+    return () => clearTimeout(debounceTimeout);
+  }, [fetchSellerLeads]);
 
   return (
-    <Card>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:px-6 sm:py-3.5">
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-1">
-          <Button variant="outline" size="icon" className="size-7 sm:size-8 shrink-0">
-            <ClipboardList className="size-4 sm:size-[18px] text-muted-foreground" />
-          </Button>
-          <span className="text-sm sm:text-base font-medium">All Sellers</span>
-          <Badge variant="secondary" className="ml-1 text-[10px] sm:text-xs">
-            {filteredSellers.length}
-          </Badge>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search leads..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-9"
+          />
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 sm:size-5 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 sm:pl-10 w-full sm:w-[160px] lg:w-[200px] h-8 sm:h-9 text-sm"
-            />
-          </div>
-
+        <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-8 sm:h-9 gap-1.5 sm:gap-2",
-                  hasActiveFilters && "border-primary text-primary"
+                  "h-9 gap-2",
+                  statusFilter !== "all" && "border-primary text-primary"
                 )}
               >
-                <Filter className="size-3.5 sm:size-4" />
-                <span className="hidden sm:inline">Filter</span>
-                {hasActiveFilters && (
-                  <span className="size-1.5 sm:size-2 rounded-full bg-primary" />
-                )}
+                <Filter className="size-4" />
+                <span>Status</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[200px]">
+            <DropdownMenuContent align="end">
               <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
                 checked={statusFilter === "all"}
                 onCheckedChange={() => setStatusFilter("all")}
               >
                 All Statuses
               </DropdownMenuCheckboxItem>
-              {statuses.map((status) => (
+              {sellerLeadStatusOptions.map((option) => (
                 <DropdownMenuCheckboxItem
-                  key={status}
-                  checked={statusFilter === status}
-                  onCheckedChange={() => setStatusFilter(status)}
+                  key={option.value}
+                  checked={statusFilter === option.value}
+                  onCheckedChange={() => setStatusFilter(option.value)}
                 >
-                  {status}
+                  {option.label}
                 </DropdownMenuCheckboxItem>
               ))}
-              
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Filter by Agent</DropdownMenuLabel>
-               <DropdownMenuCheckboxItem
-                checked={agentFilter === "all"}
-                onCheckedChange={() => setAgentFilter("all")}
-              >
-                All Agents
-              </DropdownMenuCheckboxItem>
-              {agents.map((agent) => (
-                <DropdownMenuCheckboxItem
-                  key={agent}
-                  checked={agentFilter === agent}
-                  onCheckedChange={() => setAgentFilter(agent)}
-                >
-                  {agent}
-                </DropdownMenuCheckboxItem>
-              ))}
-
-              {hasActiveFilters && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={clearFilters}
-                    className="text-destructive"
-                  >
-                    <X className="size-4 mr-2" />
-                    Clear all filters
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <div className="hidden sm:block w-px h-[22px] bg-border" />
-
-           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 sm:h-9 gap-1.5 sm:gap-2">
-                <FileInput className="size-3.5 sm:size-4" />
-                <span className="hidden sm:inline">Import</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <FileSpreadsheet className="size-4 mr-2" />
-                Import from CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <FileText className="size-4 mr-2" />
-                Import from Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Database className="size-4 mr-2" />
-                Import from CRM
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
-      
-      {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-6 pb-3">
-          <span className="text-[10px] sm:text-xs text-muted-foreground">Filters:</span>
-          {statusFilter !== "all" && (
-            <Badge
-              variant="secondary"
-              className="gap-1 cursor-pointer text-[10px] sm:text-xs h-5 sm:h-6"
-              onClick={() => setStatusFilter("all")}
-            >
-              Status: {statusFilter}
-              <X className="size-2.5 sm:size-3" />
-            </Badge>
-          )}
-          {agentFilter !== "all" && (
-            <Badge
-              variant="secondary"
-              className="gap-1 cursor-pointer text-[10px] sm:text-xs h-5 sm:h-6"
-              onClick={() => setAgentFilter("all")}
-            >
-              Agent: {agentFilter}
-              <X className="size-2.5 sm:size-3" />
-            </Badge>
-          )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center gap-2 text-muted-foreground h-24">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading seller leads...
         </div>
+      ) : (
+        <DataTable columns={columns} data={data} filterColumn="name" />
       )}
-
-      <div className="px-3 sm:px-6 pb-3 sm:pb-4 overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="w-[40px] font-medium text-muted-foreground text-xs sm:text-sm">#</TableHead>
-              <TableHead className="min-w-[180px] font-medium text-muted-foreground text-xs sm:text-sm">Name</TableHead>
-              <TableHead className="hidden md:table-cell min-w-[140px] font-medium text-muted-foreground text-xs sm:text-sm">Email</TableHead>
-              <TableHead className="min-w-[100px] font-medium text-muted-foreground text-xs sm:text-sm">Status</TableHead>
-              <TableHead className="min-w-[90px] font-medium text-muted-foreground text-xs sm:text-sm">Properties</TableHead>
-              <TableHead className="hidden lg:table-cell min-w-[150px] font-medium text-muted-foreground text-xs sm:text-sm">Agent</TableHead>
-              <TableHead className="w-[40px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedSellers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  No sellers found matching your filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedSellers.map((seller, index) => (
-                <TableRow key={seller.id}>
-                  <TableCell className="font-medium text-xs sm:text-sm">
-                    {(currentPage - 1) * pageSize + index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-xs sm:text-sm block truncate">
-                      {seller.name}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground text-xs sm:text-sm">
-                    {seller.email}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 font-medium text-[10px] sm:text-xs">
-                      {seller.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs sm:text-sm tabular-nums">
-                    {seller.properties}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="size-5 sm:size-6 bg-muted">
-                        <AvatarFallback className="text-[8px] sm:text-[10px] font-extrabold text-muted-foreground uppercase">
-                          {seller.assignedAgent.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-muted-foreground text-xs sm:text-sm">{seller.assignedAgent.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-7 sm:size-8 text-muted-foreground hover:text-foreground">
-                          <MoreHorizontal className="size-3.5 sm:size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="size-4 mr-2" /> View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Pencil className="size-4 mr-2" /> Edit Seller
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="size-4 mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-6 py-3 border-t">
-         <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          <span className="hidden sm:inline">Rows per page:</span>
-          <Select
-            value={pageSize.toString()}
-            onValueChange={(value) => setPageSize(Number(value))}
-          >
-            <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={size.toString()}>
-                  {size}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-muted-foreground">
-            {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredSellers.length)} of {filteredSellers.length}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(1)} disabled={currentPage === 1}>
-            <ChevronsLeft className="size-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button variant="outline" size="icon" className="size-8" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages}>
-            <ChevronsRight className="size-4" />
-          </Button>
-        </div>
-      </div>
-    </Card>
+    </div>
   );
 }

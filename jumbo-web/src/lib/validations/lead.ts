@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { leads } from "@/lib/db/schema";
+import { indianPhoneSchema } from "./common";
 
 // Base schemas from Drizzle
 export const insertLeadSchema = createInsertSchema(leads, {
@@ -21,7 +22,7 @@ export const createLeadRequestSchema = z.object({
   // Profile info (will create or find existing profile)
   profile: z.object({
     fullName: z.string().min(2, "Name must be at least 2 characters"),
-    phone: z.string().regex(/^\+91[0-9]{10}$/, "Phone must be a valid Indian number (+91XXXXXXXXXX)"),
+    phone: indianPhoneSchema,
     email: z.string().email().optional().nullable(),
   }),
   // Lead specific info

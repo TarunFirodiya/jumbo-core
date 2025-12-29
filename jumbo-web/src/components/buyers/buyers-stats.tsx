@@ -1,6 +1,7 @@
 "use client";
 
 import { UserCheck, UserPlus, Users, Wallet } from "lucide-react";
+import { Stats, type StatItem } from "@/components/ui/stats";
 
 interface BuyersStatsProps {
   stats: {
@@ -11,70 +12,36 @@ interface BuyersStatsProps {
 }
 
 export function BuyersStats({ stats }: BuyersStatsProps) {
-  const statsData = [
+  const statsData: StatItem[] = [
     {
       title: "Total Buyers",
       value: stats.totalBuyers.toLocaleString(),
-      change: "+12%", // Ideally calculate from historical data
-      changeValue: "(320)",
-      isPositive: true,
+      change: "+12%",
+      changeType: "positive",
       icon: Users,
     },
     {
       title: "Active Buyers",
       value: stats.activeBuyers.toLocaleString(),
       change: "+8%",
-      changeValue: "(124)",
-      isPositive: true,
+      changeType: "positive",
       icon: UserCheck,
     },
     {
       title: "New This Month",
       value: stats.newThisMonth.toLocaleString(),
       change: "-5%",
-      changeValue: "(12)",
-      isPositive: false,
+      changeType: "negative",
       icon: UserPlus,
     },
     {
       title: "Total Budget",
-      value: "$42M", // Placeholder as it's hard to sum JSONB without sql cast
+      value: "$42M",
       change: "+15%",
-      changeValue: "($5M)",
-      isPositive: true,
+      changeType: "positive",
       icon: Wallet,
     },
   ];
 
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 p-3 sm:p-4 lg:p-6 rounded-xl border bg-card">
-      {statsData.map((stat, index) => (
-        <div key={stat.title} className="flex items-start">
-          <div className="flex-1 space-y-2 sm:space-y-4 lg:space-y-6">
-            <div className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground">
-              <stat.icon className="size-3.5 sm:size-[18px]" />
-              <span className="text-[10px] sm:text-xs lg:text-sm font-medium truncate">{stat.title}</span>
-            </div>
-            <p className="text-lg sm:text-xl lg:text-[28px] font-semibold leading-tight tracking-tight">
-              {stat.value}
-            </p>
-            {/* Keeping the trend UI but static for now as we don't have historical data logic yet */}
-            {/* <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-[10px] sm:text-xs lg:text-sm font-medium">
-              <span
-                className={stat.isPositive ? "text-emerald-600" : "text-red-600"}
-              >
-                {stat.change}
-                <span className="hidden sm:inline">{stat.changeValue}</span>
-              </span>
-              <span className="text-muted-foreground hidden sm:inline">vs Last Months</span>
-            </div> */}
-          </div>
-          {index < statsData.length - 1 && (
-            <div className="hidden lg:block w-px h-full bg-border mx-4 xl:mx-6" />
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return <Stats data={statsData} />;
 }
-

@@ -93,18 +93,74 @@ export async function GET(request: NextRequest) {
 }
 
 /**
+ * Verify API key for external webhook access
+ */
+function verifyApiKey(request: NextRequest): boolean {
+  const apiKey = request.headers.get("x-api-key");
+  const expectedKey = process.env.LEADS_API_SECRET;
+
+  // If no secret is configured, reject all requests (secure by default)
+  if (!expectedKey) {
+    console.warn("LEADS_API_SECRET is not configured");
+    return false;
+  }
+
+  return apiKey === expectedKey;
+}
+
+/**
  * POST /api/v1/leads
- * Create a new lead (internal or from webhooks)
+ * Create a new lead from external webhooks (e.g., Housing.com via Make.com)
+ * Requires x-api-key header for authentication
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const validatedData = createLeadRequestSchema.parse(body);
+    // Step 1: Verify API key
+    if (!verifyApiKey(request)) {
+      return NextResponse.json(
+        { error: "Unauthorized", message: "Invalid or missing API key" },
+        { status: 401 }
+      );
+    }
 
-    // Check if profile already exists by phone
+    const body = await request.json();
+    console.log("Received lead creation request:", JSON.stringify(body, null, 2));
+
+    const validatedData = createLeadRequestSchema.parse(body);
+    console.log("Validation successful");
+
+    // Step 2: Check for duplicate lead using externalId + source
+    if (validatedData.externalId && validatedData.source) {
+      const existingLead = await db.query.leads.findFirst({
+        where: and(
+          eq(leads.externalId, validatedData.externalId),
+          eq(leads.source, validatedData.source)
+        ),
+        with: {
+          profile: true,
+          assignedAgent: true,
+        },
+      });
+
+      if (existingLead) {
+        console.log("Duplicate lead detected, returning existing:", existingLead.id);
+        return NextResponse.json(
+          {
+            data: existingLead,
+            message: "Lead already exists",
+            duplicate: true,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
+    // Step 3: Check if profile already exists by phone
     let profile = await db.query.profiles.findFirst({
       where: eq(profiles.phone, validatedData.profile.phone),
     });
+
+    console.log("Existing profile:", profile ? profile.id : "Not found");
 
     // Create profile if not exists
     if (!profile) {
@@ -118,18 +174,22 @@ export async function POST(request: NextRequest) {
         })
         .returning();
       profile = newProfile;
+      console.log("Created new profile:", profile.id);
     }
 
-    // Create the lead
+    // Step 4: Create the lead
     const [newLead] = await db
       .insert(leads)
       .values({
         profileId: profile.id,
         source: validatedData.source,
+        externalId: validatedData.externalId,
         status: "new",
         requirementJson: validatedData.requirements,
       })
       .returning();
+      
+    console.log("Created new lead:", newLead.id);
 
     // Fetch lead with relations
     const leadWithRelations = await db.query.leads.findFirst({
@@ -151,16 +211,17 @@ export async function POST(request: NextRequest) {
     console.error("Error creating lead:", error);
 
     if (error instanceof Error && error.name === "ZodError") {
+      // @ts-expect-error - ZodError is known structure
+      const details = error.flatten();
       return NextResponse.json(
-        { error: "Validation Error", message: "Invalid request body", details: error },
+        { error: "Validation Error", message: "Invalid request body", details },
         { status: 400 }
       );
     }
 
     return NextResponse.json(
-      { error: "Internal Server Error", message: "Failed to create lead" },
+      { error: "Internal Server Error", message: error instanceof Error ? error.message : "Failed to create lead" },
       { status: 500 }
     );
   }
 }
-

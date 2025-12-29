@@ -10,7 +10,6 @@ import {
   type KanbanColumnProps,
   type KanbanItemProps,
 } from "@/components/kibo-ui/kanban";
-import { visits, type Visit } from "@/mock-data/visits";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,9 +36,15 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import type { VisitFormatted } from "@/app/(dashboard)/visits/page";
 
 interface KanbanVisit extends KanbanItemProps {
-  original: Visit;
+  original: VisitFormatted;
+}
+
+interface VisitsKanbanProps {
+  data: VisitFormatted[];
 }
 
 const COLUMNS: KanbanColumnProps[] = [
@@ -49,17 +54,17 @@ const COLUMNS: KanbanColumnProps[] = [
   { id: "Cancelled", name: "Cancelled" },
 ];
 
-export function VisitsKanban() {
+export function VisitsKanban({ data }: VisitsKanbanProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
 
   const agents = useMemo(() => {
-    const agentSet = new Set(visits.map((v) => v.agent.name));
+    const agentSet = new Set(data.map((v) => v.agent.name));
     return Array.from(agentSet);
-  }, []);
+  }, [data]);
 
   const initialData: KanbanVisit[] = useMemo(() => {
-    return visits
+    return data
       .filter((visit) => {
         const matchesSearch =
           visit.property.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -69,12 +74,12 @@ export function VisitsKanban() {
         return matchesSearch && matchesAgent;
       })
       .map((visit) => ({
-        id: visit.id.toString(),
+        id: visit.id,
         name: visit.property.name,
         column: visit.status,
         original: visit,
       }));
-  }, [searchQuery, agentFilter]);
+  }, [data, searchQuery, agentFilter]);
 
   const [tasks, setTasks] = useState<KanbanVisit[]>(initialData);
 
@@ -150,11 +155,12 @@ export function VisitsKanban() {
                 </div>
               </KanbanHeader>
               <KanbanCards id={column.id}>
-                {(item) => (
+                {(item: KanbanVisit) => (
                   <KanbanCard
                     key={item.id}
                     id={item.id}
                     name={item.name}
+                    column={item.column}
                     className="p-3 space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -180,8 +186,10 @@ export function VisitsKanban() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="size-4 mr-2" /> View Details
+                          <DropdownMenuItem asChild>
+                            <Link href={`/visits/${item.id}`} className="cursor-pointer w-full">
+                              <Eye className="size-4 mr-2" /> View Details
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             <Pencil className="size-4 mr-2" /> Edit
@@ -207,7 +215,7 @@ export function VisitsKanban() {
                          {item.original.dateTime.time && (
                              <div className="flex items-center gap-1">
                                 <Clock className="size-3" />
-                                <span>{item.original.dateTime.time.split("-")[0].trim()}</span>
+                                <span>{item.original.dateTime.time}</span>
                             </div>
                          )}
                       </div>

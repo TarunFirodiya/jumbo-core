@@ -179,9 +179,9 @@ async function seed() {
         source: b.source,
         status: b.status.toLowerCase(), // "Active" -> "active" (schema default is 'new')
         requirementJson: {
-          budget_desc: b.preferences.budget,
-          type: b.preferences.type,
-          timeline: b.preferences.timeline
+          // budget_desc: b.preferences.budget, // Remapped to schema
+          // type: b.preferences.type,
+          // timeline: b.preferences.timeline
         },
         lastContactedAt: new Date(), // Just use now
         createdAt: new Date(b.addedDate),

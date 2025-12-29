@@ -44,9 +44,9 @@ import { Badge } from "@/components/ui/badge";
 
 // Form Schema
 const formSchema = z.object({
-  buyerId: z.string({ required_error: "Please select a buyer." }),
-  listingId: z.string({ required_error: "Please select a listing." }),
-  date: z.date({ required_error: "Please select a date and time." }),
+  buyerId: z.string().min(1, "Please select a buyer."),
+  listingId: z.string().min(1, "Please select a listing."),
+  date: z.date(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -131,12 +131,18 @@ export function VisitForm({
   const onSubmit = async (values: FormValues) => {
     try {
       setIsSubmitting(true);
-      // Simulate API call
-      // In a real app, this would POST to /api/v1/visits
-      console.log("Submitting visit:", values);
       
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch("/api/v1/visits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create visit");
+      }
       
       toast.success("Visit scheduled successfully");
       onSuccess?.();

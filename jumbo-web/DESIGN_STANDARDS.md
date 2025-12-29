@@ -134,3 +134,50 @@ import { Search } from "lucide-react"
 - Ensure all custom colors have a dark mode equivalent in `globals.css`.
 - Avoid hardcoding `bg-white` or `text-black`. Use `bg-background` and `text-foreground`.
 
+## 9. Forms
+- **Standard Component**: Use the `Form` component from `src/components/ui/form.tsx`.
+- **Validation**: ALWAYS use `zod` and `react-hook-form` with `@hookform/resolvers/zod`.
+- **Structure**:
+  ```tsx
+  import { useForm } from "react-hook-form"
+  import { zodResolver } from "@hookform/resolvers/zod"
+  import { z } from "zod"
+  import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+  
+  // Define schema
+  const formSchema = z.object({
+    username: z.string().min(2),
+  })
+
+  export function ProfileForm() {
+    const form = useForm<z.infer<typeof formSchema>>({
+      resolver: zodResolver(formSchema),
+      defaultValues: { username: "" },
+    })
+    
+    function onSubmit(values: z.infer<typeof formSchema>) {
+      console.log(values)
+    }
+
+    return (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </form>
+      </Form>
+    )
+  }
+  ```
+

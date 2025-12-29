@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard - Cliento CRM",
-  description: "A modern CRM dashboard",
+  title: "Jumbo Core",
+  description: "Operating system for Jumbo Homes",
 };
 
 export default function RootLayout({
@@ -27,6 +27,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <ThemeProvider
           attribute="class"
