@@ -38,6 +38,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import type { SellerLeadWithRelations } from "@/types";
 import { sellerLeadStatusOptions } from "@/lib/validations/seller";
+import type { SellerLead } from "@/services/types";
 
 interface KanbanSellerLead extends KanbanItemProps {
   original: SellerLeadWithRelations;
@@ -48,31 +49,18 @@ const COLUMNS: KanbanColumnProps[] = sellerLeadStatusOptions.map((option) => ({
   name: option.label,
 }));
 
-export function SellersKanban() {
+interface SellersKanbanProps {
+  data: SellerLead[];
+}
+
+export function SellersKanban({ data: initialData }: SellersKanbanProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [allLeads, setAllLeads] = useState<SellerLeadWithRelations[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [allLeads, setAllLeads] = useState<SellerLeadWithRelations[]>(initialData as SellerLeadWithRelations[]);
 
-  const fetchSellerLeads = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch("/api/v1/seller-leads?limit=100");
-      if (!response.ok) {
-        throw new Error("Failed to fetch seller leads");
-      }
-      const result = await response.json();
-      setAllLeads(result.data || []);
-    } catch (error) {
-      console.error("Error fetching seller leads:", error);
-      toast.error("Failed to load seller leads");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
+  // Update leads when initialData changes
   useEffect(() => {
-    fetchSellerLeads();
-  }, [fetchSellerLeads]);
+    setAllLeads(initialData as SellerLeadWithRelations[]);
+  }, [initialData]);
 
   const filteredData: KanbanSellerLead[] = useMemo(() => {
     return allLeads
@@ -131,15 +119,6 @@ export function SellersKanban() {
       }
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center gap-2 text-muted-foreground h-64">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading seller leads...
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -267,7 +246,7 @@ export function SellersKanban() {
                             <AvatarFallback className="text-[9px]">
                               {item.original.assignedTo.fullName
                                 ?.split(" ")
-                                .map((n) => n[0])
+                                .map((n: string) => n[0])
                                 .join("")
                                 .slice(0, 2) || "?"}
                             </AvatarFallback>

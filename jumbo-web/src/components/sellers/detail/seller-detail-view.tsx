@@ -101,7 +101,6 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
       source: sellerLead?.source,
       sourceUrl: sellerLead?.sourceUrl || "",
       isNri: sellerLead?.isNri || false,
-      notes: sellerLead?.notes || "",
       followUpDate: sellerLead?.followUpDate
         ? new Date(sellerLead.followUpDate).toISOString().slice(0, 16)
         : "",
@@ -334,7 +333,7 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
                     <AvatarFallback className="text-xs">
                       {sellerLead.assignedTo.fullName
                         ?.split(" ")
-                        .map((n) => n[0])
+                        .map((n: string) => n[0])
                         .join("")
                         .slice(0, 2) || "?"}
                     </AvatarFallback>
@@ -758,23 +757,6 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
         <TabsContent value="notes" className="m-0 h-full">
           <Card className="h-full border-none shadow-sm">
             <CardContent className="p-4 sm:p-6">
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Add notes about this lead..."
-                        className="min-h-[150px] sm:min-h-[200px] w-full resize-y"
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,96 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { leads, profiles } from "@/lib/db/schema";
 import { createLeadRequestSchema, leadQuerySchema } from "@/lib/validations";
-import { eq, and, ilike, sql, desc } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/server";
+import { withAuth } from "@/lib/api-helpers";
+import * as leadService from "@/services/lead.service";
 
 /**
  * GET /api/v1/leads
  * List leads with filtering and pagination
  */
-export async function GET(request: NextRequest) {
-  try {
-    // Verify authentication
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+export const GET = withAuth(
+  async (request: NextRequest, { profile }) => {
+    try {
+      // Parse and validate query params
+      const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+      const query = leadQuerySchema.parse(searchParams);
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        { status: 401 }
-      );
-    }
+      // For non-admin users, only show their assigned leads
+      let agentId = query.agentId;
+      if (profile.role !== "super_admin" && profile.role !== "team_lead") {
+        agentId = profile.id;
+      }
 
-    // Parse and validate query params
-    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
-    const query = leadQuerySchema.parse(searchParams);
-
-    // Build query conditions
-    const conditions = [];
-
-    if (query.status) {
-      conditions.push(eq(leads.status, query.status));
-    }
-
-    if (query.source) {
-      conditions.push(eq(leads.source, query.source));
-    }
-
-    if (query.agentId) {
-      conditions.push(eq(leads.assignedAgentId, query.agentId));
-    }
-
-    // Soft delete filter
-    conditions.push(sql`${leads.deletedAt} IS NULL`);
-
-    // Execute query with pagination
-    const offset = (query.page - 1) * query.limit;
-
-    const [leadsData, countResult] = await Promise.all([
-      db.query.leads.findMany({
-        where: conditions.length > 0 ? and(...conditions) : undefined,
-        with: {
-          profile: true,
-          assignedAgent: true,
-        },
-        limit: query.limit,
-        offset,
-        orderBy: [desc(leads.createdAt)],
-      }),
-      db
-        .select({ count: sql<number>`count(*)` })
-        .from(leads)
-        .where(conditions.length > 0 ? and(...conditions) : undefined),
-    ]);
-
-    const total = Number(countResult[0]?.count ?? 0);
-
-    return NextResponse.json({
-      data: leadsData,
-      pagination: {
+      const result = await leadService.getLeads({
         page: query.page,
         limit: query.limit,
-        total,
-        totalPages: Math.ceil(total / query.limit),
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching leads:", error);
+        status: query.status,
+        source: query.source,
+        agentId,
+      });
 
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { error: "Validation Error", message: "Invalid query parameters" },
-        { status: 400 }
-      );
+      return {
+        data: result.data,
+        pagination: result.pagination,
+      };
+    } catch (error) {
+      console.error("Error fetching leads:", error);
+
+      if (error instanceof Error && error.name === "ZodError") {
+        throw new Error("Invalid query parameters");
+      }
+
+      throw error;
     }
-
-    return NextResponse.json(
-      { error: "Internal Server Error", message: "Failed to fetch leads" },
-      { status: 500 }
-    );
-  }
-}
+  },
+  "leads:read"
+);
 
 /**
  * Verify API key for external webhook access
@@ -131,16 +84,10 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Check for duplicate lead using externalId + source
     if (validatedData.externalId && validatedData.source) {
-      const existingLead = await db.query.leads.findFirst({
-        where: and(
-          eq(leads.externalId, validatedData.externalId),
-          eq(leads.source, validatedData.source)
-        ),
-        with: {
-          profile: true,
-          assignedAgent: true,
-        },
-      });
+      const existingLead = await leadService.findLeadByExternalId(
+        validatedData.externalId,
+        validatedData.source
+      );
 
       if (existingLead) {
         console.log("Duplicate lead detected, returning existing:", existingLead.id);
@@ -155,50 +102,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 3: Check if profile already exists by phone
-    let profile = await db.query.profiles.findFirst({
-      where: eq(profiles.phone, validatedData.profile.phone),
+    // Step 3: Create lead with profile
+    const lead = await leadService.createLeadWithProfile({
+      profile: {
+        fullName: validatedData.profile.fullName,
+        phone: validatedData.profile.phone,
+        email: validatedData.profile.email || undefined,
+      },
+      leadId: validatedData.leadId,
+      source: validatedData.source,
+      externalId: validatedData.externalId || undefined,
+      secondaryPhone: validatedData.secondaryPhone || undefined,
+      sourceListingId: validatedData.sourceListingId || undefined,
+      dropReason: validatedData.dropReason || undefined,
+      locality: validatedData.locality || undefined,
+      zone: validatedData.zone || undefined,
+      pipeline: validatedData.pipeline,
+      referredBy: validatedData.referredBy || undefined,
+      testListingId: validatedData.testListingId || undefined,
+      requirements: validatedData.requirements,
+      preferences: validatedData.preferences,
     });
 
-    console.log("Existing profile:", profile ? profile.id : "Not found");
-
-    // Create profile if not exists
-    if (!profile) {
-      const [newProfile] = await db
-        .insert(profiles)
-        .values({
-          fullName: validatedData.profile.fullName,
-          phone: validatedData.profile.phone,
-          email: validatedData.profile.email,
-          role: "buyer_agent", // Default role for leads/buyers
-        })
-        .returning();
-      profile = newProfile;
-      console.log("Created new profile:", profile.id);
-    }
-
-    // Step 4: Create the lead
-    const [newLead] = await db
-      .insert(leads)
-      .values({
-        profileId: profile.id,
-        source: validatedData.source,
-        externalId: validatedData.externalId,
-        status: "new",
-        requirementJson: validatedData.requirements,
-      })
-      .returning();
-      
-    console.log("Created new lead:", newLead.id);
+    console.log("Created new lead:", lead.id);
 
     // Fetch lead with relations
-    const leadWithRelations = await db.query.leads.findFirst({
-      where: eq(leads.id, newLead.id),
-      with: {
-        profile: true,
-        assignedAgent: true,
-      },
-    });
+    const leadWithRelations = await leadService.getLeadById(lead.id);
 
     return NextResponse.json(
       {

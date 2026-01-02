@@ -1,10 +1,16 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { createLeadRequestSchema } from "@/lib/validations/lead"
-import { Button } from "@/components/ui/button"
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  createLeadFormSchema,
+  leadSourceOptions,
+  leadStatusOptions,
+  type CreateLeadFormData,
+} from "@/lib/validations/lead";
+import { createLead } from "@/lib/actions";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -12,36 +18,66 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
-
-// We can refine the schema for the form if needed, or use the API schema directly
-// Flattening for the form might be easier
-const formSchema = z.object({
-  fullName: z.string().min(2, "Name must be at least 2 characters"),
-  phone: z.string().regex(/^\+91[0-9]{10}$/, "Phone must be a valid Indian number (+91XXXXXXXXXX)"),
-  email: z.string().email().optional().or(z.literal("")),
-  source: z.string().min(1, "Source is required"),
-})
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { toast } from "sonner";
+import { Loader2, User, Mail } from "lucide-react";
 
 interface NewLeadFormProps {
-  onSuccess?: () => void
+  onSuccess?: () => void;
+}
+
+interface AgentOption {
+  id: string;
+  fullName: string;
 }
 
 export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
+
+  const form = useForm<CreateLeadFormData>({
+    resolver: zodResolver(createLeadFormSchema) as any,
     defaultValues: {
       fullName: "",
-      phone: "+91",
+      phone: "",
       email: "",
+      secondaryPhone: "",
       source: "manual_entry",
+      status: "new",
+      assignedAgentId: null,
     },
-  })
+  });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  // Fetch agents for dropdown
+  useEffect(() => {
+    async function fetchAgents() {
+      try {
+        const response = await fetch("/api/v1/agents");
+        if (response.ok) {
+          const data = await response.json();
+          setAgents(data.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agents:", error);
+      } finally {
+        setIsLoadingAgents(false);
+      }
+    }
+    fetchAgents();
+  }, []);
+
+  async function onSubmit(values: CreateLeadFormData) {
+    setIsSubmitting(true);
     try {
       // Map form values to API schema structure
       const payload = {
@@ -51,107 +87,221 @@ export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
           email: values.email || undefined,
         },
         source: values.source,
-      }
-      
-      const response = await fetch("/api/v1/leads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+        status: values.status,
+        secondaryPhone: values.secondaryPhone || undefined,
+        assignedAgentId: values.assignedAgentId || undefined,
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create lead");
+      const result = await createLead(payload);
+
+      if (result.success) {
+        toast.success(result.message || "Lead created successfully");
+        form.reset();
+        onSuccess?.();
+      } else {
+        toast.error(result.message || "Failed to create lead");
       }
-      
-      const data = await response.json();
-      console.log("Lead created:", data);
-      
-      toast.success("Lead created successfully")
-      form.reset()
-      onSuccess?.()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create lead")
-      console.error(error)
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create lead"
+      );
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Full Name */}
         <FormField
           control={form.control}
           name="fullName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Full Name</FormLabel>
+              <FormLabel>Full Name *</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone Number</FormLabel>
-              <FormControl>
-                <Input placeholder="+919876543210" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email (Optional)</FormLabel>
-              <FormControl>
-                <Input type="email" placeholder="john@example.com" {...field} />
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    placeholder="John Doe"
+                    className="pl-9"
+                    {...field}
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
+        {/* Phone Number */}
         <FormField
           control={form.control}
-          name="source"
+          name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Source</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormLabel>Phone Number *</FormLabel>
+              <FormControl>
+                <PhoneInput
+                  defaultCountry="IN"
+                  placeholder="Enter phone number"
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Email */}
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    placeholder="john@example.com"
+                    className="pl-9"
+                    {...field}
+                  />
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Secondary Phone */}
+        <FormField
+          control={form.control}
+          name="secondaryPhone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Secondary Phone</FormLabel>
+              <FormControl>
+                <PhoneInput
+                  defaultCountry="IN"
+                  placeholder="Enter secondary phone"
+                  value={field.value || ""}
+                  onChange={field.onChange}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Source */}
+          <FormField
+            control={form.control}
+            name="source"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Source *</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {leadSourceOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Status */}
+          <FormField
+            control={form.control}
+            name="status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {leadStatusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Assigned Agent */}
+        <FormField
+          control={form.control}
+          name="assignedAgentId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Assigned Agent</FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value || undefined}
+                disabled={isLoadingAgents}
+              >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a source" />
+                    <SelectValue
+                      placeholder={
+                        isLoadingAgents
+                          ? "Loading agents..."
+                          : "Select agent (optional)"
+                      }
+                    />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="manual_entry">Manual Entry</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
-                  <SelectItem value="walk_in">Walk-in</SelectItem>
-                  <SelectItem value="phone_inquiry">Phone Inquiry</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.fullName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
             </FormItem>
           )}
         />
-        
+
         <div className="flex justify-end pt-4">
-          <Button type="submit">Create Lead</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Create Lead
+          </Button>
         </div>
       </form>
     </Form>
-  )
+  );
 }
-

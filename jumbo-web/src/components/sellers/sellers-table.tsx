@@ -30,6 +30,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { SellerLeadWithRelations } from "@/types";
 import { sellerLeadStatusOptions } from "@/lib/validations/seller";
+import type { SellerLead } from "@/services/types";
+import type { PaginatedResult } from "@/services/types";
 
 // Status badge colors
 const statusColors: Record<string, { bg: string; text: string }> = {
@@ -144,41 +146,37 @@ export const columns: ColumnDef<SellerLeadWithRelations>[] = [
   },
 ];
 
-export function SellersTable() {
-  const [data, setData] = React.useState<SellerLeadWithRelations[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+interface SellersTableProps {
+  data: SellerLead[];
+  pagination: PaginatedResult<SellerLead>["pagination"];
+}
+
+export function SellersTable({ data: initialData, pagination }: SellersTableProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
 
-  const fetchSellerLeads = React.useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams();
-      if (searchQuery) params.set("search", searchQuery);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      
-      const response = await fetch(`/api/v1/seller-leads?${params.toString()}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("API Error:", response.status, response.statusText, errorData);
-        throw new Error(errorData.message || `Failed to fetch seller leads (${response.status})`);
-      }
-      const result = await response.json();
-      setData(result.data);
-    } catch (error) {
-      console.error("Error fetching seller leads:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to load seller leads");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery, statusFilter]);
+  // Client-side filtering
+  const filteredData = React.useMemo(() => {
+    let filtered = [...initialData] as SellerLeadWithRelations[];
 
-  React.useEffect(() => {
-    const debounceTimeout = setTimeout(() => {
-      fetchSellerLeads();
-    }, 300);
-    return () => clearTimeout(debounceTimeout);
-  }, [fetchSellerLeads]);
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (lead) =>
+          lead.name?.toLowerCase().includes(query) ||
+          lead.email?.toLowerCase().includes(query) ||
+          lead.phone?.includes(query)
+      );
+    }
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((lead) => lead.status === statusFilter);
+    }
+
+    return filtered;
+  }, [initialData, searchQuery, statusFilter]);
 
   return (
     <div className="space-y-4">
@@ -230,14 +228,7 @@ export function SellersTable() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center gap-2 text-muted-foreground h-24">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading seller leads...
-        </div>
-      ) : (
-        <DataTable columns={columns} data={data} filterColumn="name" />
-      )}
+      <DataTable columns={columns} data={filteredData} filterColumn="name" />
     </div>
   );
 }

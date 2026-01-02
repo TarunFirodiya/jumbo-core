@@ -13,10 +13,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { offers } from "@/mock-data/offers";
+import type { Offer } from "@/services/types";
+import Link from "next/link";
 
-// Define Offer type based on mock data
-interface Offer {
+// Transform Offer from service to table display format
+type TableOffer = {
   id: string;
   property: string;
   buyer: string;
@@ -25,6 +26,40 @@ interface Offer {
   agent: string;
   agentInitials: string;
   date: string;
+};
+
+function transformOffer(offer: Offer & {
+  listing?: {
+    unit?: {
+      building?: { name: string | null } | null;
+    } | null;
+  } | null;
+  lead?: {
+    profile?: { fullName: string | null } | null;
+  } | null;
+  createdBy?: { fullName: string | null } | null;
+}): TableOffer {
+  const buildingName = offer.listing?.unit?.building?.name || "Unknown Building";
+  const buyerName = offer.lead?.profile?.fullName || "Unknown Buyer";
+  const agentName = offer.createdBy?.fullName || "Unassigned";
+  const agentInitials = agentName
+    ? agentName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "??";
+  
+  const statusLabel = offer.status?.charAt(0).toUpperCase() + (offer.status?.slice(1) || "") || "Pending";
+  const amount = offer.offerAmount ? Number(offer.offerAmount) : 0;
+  const date = offer.createdAt ? new Date(offer.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+
+  return {
+    id: offer.id,
+    property: buildingName,
+    buyer: buyerName,
+    status: statusLabel,
+    amount,
+    agent: agentName,
+    agentInitials,
+    date,
+  };
 }
 
 export const columns: ColumnDef<Offer>[] = [
@@ -104,6 +139,11 @@ export const columns: ColumnDef<Offer>[] = [
   },
 ];
 
-export function OffersTable() {
-  return <DataTable columns={columns} data={offers} filterColumn="property" />;
+interface OffersTableProps {
+  data: Offer[];
+}
+
+export function OffersTable({ data }: OffersTableProps) {
+  const tableData = data.map(transformOffer);
+  return <DataTable columns={columns} data={tableData} filterColumn="property" />;
 }

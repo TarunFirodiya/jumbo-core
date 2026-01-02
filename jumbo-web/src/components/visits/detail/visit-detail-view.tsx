@@ -87,7 +87,7 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
   const [isSaving, setIsSaving] = React.useState(false);
 
   const form = useForm<VisitFormValues>({
-    resolver: zodResolver(visitFormSchema),
+    resolver: zodResolver(visitFormSchema) as any,
     defaultValues: {
       status: visit?.status || "Pending",
       feedback: visit?.feedback || "",
@@ -99,7 +99,10 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
   async function onSubmit(data: VisitFormValues) {
     setIsSaving(true);
     try {
-      const result = await updateVisit(id, data);
+      const result = await updateVisit(id, {
+        ...data,
+        status: data.status as "pending" | "in_progress" | "completed" | "scheduled" | "cancelled" | "no_show",
+      });
       if (result.success) {
         toast.success(result.message);
       } else {

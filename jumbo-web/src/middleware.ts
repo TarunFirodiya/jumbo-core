@@ -2,19 +2,51 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import type { UserRole } from "@/lib/db/schema";
 
-// Routes that require authentication
-const PROTECTED_ROUTES = ["/settings"];
+// Public routes that don't require authentication
+const PUBLIC_ROUTES = ["/login", "/auth/callback"];
 
 // Routes that should redirect to dashboard if already authenticated
-const AUTH_ROUTES = ["/login", "/signup"];
+const AUTH_ROUTES = ["/login"];
+
+// All dashboard routes require authentication
+const DASHBOARD_ROUTES = [
+  "/buyers",
+  "/sellers",
+  "/listings",
+  "/visits",
+  "/offers",
+  "/settings",
+];
 
 // Role-based route access configuration
 const ROLE_ACCESS: Record<string, UserRole[]> = {
   "/settings/admin": ["super_admin"],
   "/settings/team": ["super_admin", "team_lead"],
-  "/tours/dispatch": ["super_admin", "dispatch_agent", "team_lead"],
   "/listings/new": ["super_admin", "listing_agent", "team_lead"],
+  "/sellers/new": ["super_admin", "seller_agent", "team_lead"],
 };
+
+function isProtectedRoute(pathname: string): boolean {
+  // Root path is the dashboard, which is protected
+  if (pathname === "/") return true;
+  
+  // Check if it's a dashboard route
+  if (DASHBOARD_ROUTES.some((route) => pathname.startsWith(route))) {
+    return true;
+  }
+
+  // All other routes except public ones are protected
+  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    return false;
+  }
+
+  // API routes are handled separately, but we protect non-auth API routes
+  if (pathname.startsWith("/api") && !pathname.startsWith("/api/auth")) {
+    return true;
+  }
+
+  return true;
+}
 
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, user, supabase } = await updateSession(request);
@@ -26,15 +58,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check if route is protected
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isProtected = isProtectedRoute(pathname);
 
   // Check if route is an auth route (login/signup)
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
   // Redirect unauthenticated users to login
-  if (isProtectedRoute && !user) {
+  if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
@@ -46,7 +76,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check role-based access for authenticated users
-  if (user && isProtectedRoute) {
+  if (user && isProtected) {
     // Find the most specific matching route for RBAC
     const matchingRbacRoute = Object.keys(ROLE_ACCESS)
       .filter((route) => pathname.startsWith(route))
@@ -65,7 +95,7 @@ export async function middleware(request: NextRequest) {
 
       if (!userRole || !allowedRoles.includes(userRole)) {
         // User doesn't have required role - redirect to dashboard with error
-        const dashboardUrl = new URL("/dashboard", request.url);
+        const dashboardUrl = new URL("/", request.url);
         dashboardUrl.searchParams.set("error", "unauthorized");
         return NextResponse.redirect(dashboardUrl);
       }

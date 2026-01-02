@@ -39,6 +39,7 @@ import { cn, formatINR } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
 import type { ListingWithRelations } from "@/types";
+import { toast } from "sonner";
 
 // Status labels
 const statusLabels: Record<string, string> = {
@@ -68,11 +69,11 @@ type KanbanListingData = {
 function transformListingForKanban(listing: ListingWithRelations): KanbanListingData {
   const unit = listing.unit;
   const building = unit?.building;
-  const agent = listing.listingAgent;
+  const agent = (listing as typeof listing & { listingAgent?: { fullName: string | null } | null }).listingAgent;
   
   const agentName = agent?.fullName || "Unassigned";
   const agentInitials = agent?.fullName
-    ? agent.fullName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? agent.fullName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "??";
 
   return {
@@ -143,6 +144,44 @@ export function ListingsKanban({ data }: ListingsKanbanProps) {
     setTasks(initialData);
   }, [initialData]);
 
+  // Handle drag and drop status updates
+  const handleDataChange = async (newData: KanbanListing[]) => {
+    setTasks(newData);
+    
+    // Find listings that changed status
+    const statusUpdates = newData
+      .filter((item) => {
+        const original = data.find((l) => l.id === item.id);
+        return original && original.status !== item.column;
+      })
+      .map((item) => ({
+        id: item.id,
+        status: item.column,
+      }));
+
+    // Update each changed listing
+    for (const update of statusUpdates) {
+      try {
+        const response = await fetch(`/api/v1/listings/${update.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: update.status }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to update listing status");
+        }
+      } catch (error) {
+        console.error("Error updating listing status:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update listing status");
+        // Revert to original data
+        setTasks(initialData);
+        break; // Stop processing other updates if one fails
+      }
+    }
+  };
+
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -197,7 +236,7 @@ export function ListingsKanban({ data }: ListingsKanbanProps) {
         <KanbanProvider
           columns={COLUMNS}
           data={tasks}
-          onDataChange={(newData) => setTasks(newData)}
+          onDataChange={handleDataChange}
           className="h-[calc(100vh-280px)] min-h-[500px]"
         >
           {(column) => (

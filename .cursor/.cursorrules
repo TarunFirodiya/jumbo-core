@@ -6,6 +6,7 @@
 - **CHECK** `jumbo-web/src/components/ui/` first. If a component exists (e.g., `button.tsx`, `dialog.tsx`), import and use it.
 - **ONLY** modify the base components in `src/components/ui` if absolutely necessary for a global style change.
 - When creating feature-specific components (e.g., in `src/components/dashboard`), compose them using these UI primitives.
+- **Map Components**: **ALWAYS** use the map component from `@/components/ui/map` (Map, MapMarker, MarkerContent, MarkerPopup, etc.) when creating map UI components. Do not use other map libraries.
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router)

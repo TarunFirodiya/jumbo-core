@@ -42,24 +42,27 @@ export default async function BuyerPage({ params }: { params: Promise<{ id: stri
       budgetStr = `Max ₹${(budgetMax/100000).toFixed(0)}L`;
   }
 
+  const profile = Array.isArray(lead.profile) ? lead.profile[0] : lead.profile;
+  const assignedAgent = Array.isArray(lead.assignedAgent) ? lead.assignedAgent[0] : lead.assignedAgent;
+  
   const buyer: BuyerDetail = {
     id: lead.id,
-    name: lead.profile?.fullName || "Unknown",
-    location: lead.profile?.territoryId || "Unknown Location",
+    name: profile?.fullName || "Unknown",
+    location: profile?.territoryId || "Unknown Location",
     addedDate: lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
     status: lead.status?.charAt(0).toUpperCase() + (lead.status?.slice(1) || "") || "New",
     assignedAgent: {
-      name: lead.assignedAgent?.fullName || "Unassigned",
+      name: assignedAgent?.fullName || "Unassigned",
       avatar: undefined, 
-      initials: lead.assignedAgent?.fullName?.split(" ").map(n => n[0]).join("") || "??",
+      initials: assignedAgent?.fullName?.split(" ").map((n: string) => n[0]).join("") || "??",
     },
     lastContact: lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleDateString() : "Never",
     nextFollowUp: "Pending", // TODO: Fetch from tasks
     source: lead.source || "Unknown",
     contact: {
-      whatsapp: lead.profile?.phone || "",
-      mobile: lead.profile?.phone || "",
-      email: lead.profile?.email || "",
+      whatsapp: profile?.phone || "",
+      mobile: profile?.phone || "",
+      email: profile?.email || "",
     },
     preferences: {
       budget: budgetStr,

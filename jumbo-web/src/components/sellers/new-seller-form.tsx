@@ -40,12 +40,12 @@ export function NewSellerForm({ onSuccess }: NewSellerFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof createSellerLeadSchema>>({
-    resolver: zodResolver(createSellerLeadSchema),
+    resolver: zodResolver(createSellerLeadSchema) as any,
     defaultValues: {
       name: "",
       phone: "+91",
       email: "",
-      status: "new",
+      status: "new" as const,
       source: undefined,
       sourceUrl: "",
       referredById: null,
@@ -54,7 +54,6 @@ export function NewSellerForm({ onSuccess }: NewSellerFormProps) {
       assignedToId: null,
       followUpDate: null,
       isNri: false,
-      notes: "",
     },
   });
 
@@ -257,23 +256,6 @@ export function NewSellerForm({ onSuccess }: NewSellerFormProps) {
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Add any additional notes about this lead..."
-                  className="min-h-[80px]"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <div className="flex justify-end pt-4">
           <Button type="submit" disabled={isSubmitting}>

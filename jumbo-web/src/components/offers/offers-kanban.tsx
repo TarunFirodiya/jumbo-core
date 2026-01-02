@@ -10,7 +10,7 @@ import {
   type KanbanColumnProps,
   type KanbanItemProps,
 } from "@/components/kibo-ui/kanban";
-import { offers, type Offer } from "@/mock-data/offers";
+import type { Offer } from "@/services/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,50 +36,131 @@ import {
   MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import Link from "next/link";
 
 interface KanbanOffer extends KanbanItemProps {
-  original: Offer;
+  original: Offer & {
+    listing?: {
+      unit?: {
+        building?: { name: string | null } | null;
+      } | null;
+    } | null;
+    lead?: {
+      profile?: { fullName: string | null } | null;
+    } | null;
+    createdBy?: { fullName: string | null } | null;
+  };
 }
 
 const COLUMNS: KanbanColumnProps[] = [
-  { id: "Pending", name: "Pending" },
-  { id: "Countered", name: "Countered" },
-  { id: "Accepted", name: "Accepted" },
-  { id: "Rejected", name: "Rejected" },
+  { id: "pending", name: "Pending" },
+  { id: "countered", name: "Countered" },
+  { id: "accepted", name: "Accepted" },
+  { id: "rejected", name: "Rejected" },
 ];
 
-export function OffersKanban() {
+interface OffersKanbanProps {
+  data: Offer[];
+}
+
+export function OffersKanban({ data: initialData }: OffersKanbanProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [offers, setOffers] = useState(initialData);
+
+  // Update offers when initialData changes
+  useEffect(() => {
+    setOffers(initialData);
+  }, [initialData]);
 
   const agents = useMemo(() => {
-    const agentSet = new Set(offers.map((o) => o.agent));
+    const agentSet = new Set(
+      offers
+        .map((o) => o.createdBy?.fullName)
+        .filter((name): name is string => !!name)
+    );
     return Array.from(agentSet);
-  }, []);
+  }, [offers]);
 
-  const initialData: KanbanOffer[] = useMemo(() => {
+  const transformedData: KanbanOffer[] = useMemo(() => {
     return offers
       .filter((offer) => {
+        const buildingName = offer.listing?.unit?.building?.name || "";
+        const buyerName = offer.lead?.profile?.fullName || "";
+        const agentName = offer.createdBy?.fullName || "";
+        
         const matchesSearch =
-          offer.property.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          offer.buyer.toLowerCase().includes(searchQuery.toLowerCase());
+          buildingName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          buyerName.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesAgent =
-          agentFilter === "all" || offer.agent === agentFilter;
+          agentFilter === "all" || agentName === agentFilter;
         return matchesSearch && matchesAgent;
       })
-      .map((offer) => ({
-        id: offer.id,
-        name: offer.property,
-        column: offer.status,
-        original: offer,
-      }));
-  }, [searchQuery, agentFilter]);
+      .map((offer) => {
+        const buildingName = offer.listing?.unit?.building?.name || "Unknown Building";
+        const status = offer.status || "pending";
+        return {
+          id: offer.id,
+          name: buildingName,
+          column: status,
+          original: offer,
+        };
+      });
+  }, [offers, searchQuery, agentFilter]);
 
-  const [tasks, setTasks] = useState<KanbanOffer[]>(initialData);
+  const [tasks, setTasks] = useState<KanbanOffer[]>(transformedData);
 
   useEffect(() => {
-    setTasks(initialData);
-  }, [initialData]);
+    setTasks(transformedData);
+  }, [transformedData]);
+
+  // Handle drag and drop status updates
+  const handleDataChange = async (newData: KanbanOffer[]) => {
+    setTasks(newData);
+    
+    // Find offers that changed status
+    const statusUpdates = newData
+      .filter((item) => {
+        const original = offers.find((o) => o.id === item.id);
+        return original && original.status !== item.column;
+      })
+      .map((item) => ({
+        id: item.id,
+        status: item.column,
+      }));
+
+    // Update each changed offer
+    for (const update of statusUpdates) {
+      try {
+        const response = await fetch(`/api/v1/offers/${update.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: update.status }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to update offer status");
+        }
+
+        const result = await response.json();
+        
+        // Update local state with the response data
+        setOffers((prev) =>
+          prev.map((offer) =>
+            offer.id === update.id ? { ...offer, status: update.status as any } : offer
+          )
+        );
+      } catch (error) {
+        console.error("Error updating offer status:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update offer status");
+        // Revert to original data
+        setTasks(transformedData);
+        break; // Stop processing other updates if one fails
+      }
+    }
+  };
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -135,7 +216,7 @@ export function OffersKanban() {
         <KanbanProvider
           columns={COLUMNS}
           data={tasks}
-          onDataChange={(newData) => setTasks(newData)}
+          onDataChange={handleDataChange}
           className="h-[calc(100vh-280px)] min-h-[500px]"
         >
           {(column) => (
@@ -149,73 +230,87 @@ export function OffersKanban() {
                 </div>
               </KanbanHeader>
               <KanbanCards id={column.id}>
-                {(item: KanbanOffer) => (
-                  <KanbanCard
-                    key={item.id}
-                    id={item.id}
-                    name={item.name}
-                    column={item.column}
-                    className="p-3 space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                            <span className="font-medium text-sm block truncate">
-                                {item.original.property}
-                            </span>
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                                <User className="size-3 shrink-0" />
-                                <span className="truncate">{item.original.buyer}</span>
-                            </div>
-                        </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-6 -mr-1"
-                          >
-                            <MoreHorizontal className="size-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="size-4 mr-2" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Pencil className="size-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="size-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                {(item: KanbanOffer) => {
+                  const offer = item.original;
+                  const buildingName = offer.listing?.unit?.building?.name || "Unknown Building";
+                  const buyerName = offer.lead?.profile?.fullName || "Unknown Buyer";
+                  const agentName = offer.createdBy?.fullName || "Unassigned";
+                  const agentInitials = agentName
+                    ? agentName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+                    : "??";
+                  const amount = offer.offerAmount ? Number(offer.offerAmount) : 0;
+                  const date = offer.createdAt ? new Date(offer.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
-                    <div className="space-y-1.5 pt-1">
+                  return (
+                    <KanbanCard
+                      key={item.id}
+                      id={item.id}
+                      name={item.name}
+                      column={item.column}
+                      className="p-3 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="font-medium text-sm block truncate">
+                            {buildingName}
+                          </span>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <User className="size-3 shrink-0" />
+                            <span className="truncate">{buyerName}</span>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-6 -mr-1"
+                            >
+                              <MoreHorizontal className="size-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/offers/${item.id}`}>
+                                <Eye className="size-4 mr-2" /> View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Pencil className="size-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">
+                              <Trash2 className="size-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
                         <div className="font-semibold text-sm">
-                            ₹{item.original.amount.toLocaleString()}
+                          ₹{amount.toLocaleString()}
                         </div>
                       
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
                             <Calendar className="size-3" />
-                            <span>{item.original.date}</span>
+                            <span>{date}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t mt-2">
-                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span>{item.original.agent}</span>
-                            <Avatar className="size-5">
-                                <AvatarFallback className="text-[9px]">
-                                    {item.original.agentInitials}
-                                </AvatarFallback>
-                            </Avatar>
+                      <div className="flex items-center justify-between pt-2 border-t mt-2">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{agentName}</span>
+                          <Avatar className="size-5">
+                            <AvatarFallback className="text-[9px]">
+                              {agentInitials}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
-                    </div>
-                  </KanbanCard>
-                )}
+                      </div>
+                    </KanbanCard>
+                  );
+                }}
               </KanbanCards>
             </KanbanBoard>
           )}

@@ -56,6 +56,8 @@ import {
 } from "lucide-react";
 
 import { useDashboardStore } from "@/store/dashboard-store";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
 
 const menuItems = [
   {
@@ -101,18 +103,50 @@ export function DashboardSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const [foldersOpen, setFoldersOpen] = React.useState(true);
+  const [mounted, setMounted] = React.useState(false);
   const activeTab = useDashboardStore((state) => state.activeTab);
   const setActiveTab = useDashboardStore((state) => state.setActiveTab);
   const pathname = usePathname();
+  const { user, profile, signOut } = useAuth();
+  const router = useRouter();
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/login");
+  };
+
+  const userInitials = mounted && profile?.fullName
+    ? profile.fullName
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : mounted && user?.email?.[0].toUpperCase() || "U";
+
+  const userName = mounted ? (profile?.fullName || user?.email?.split('@')[0] || "User") : "User";
+  const userEmail = mounted ? (profile?.email || user?.email || "") : "";
+
+  // Only calculate active state on client to avoid hydration mismatch
+  const getIsActive = (item: typeof menuItems[0]) => {
+    if (!mounted) return false;
+    return item.href === "/" 
+      ? pathname === "/" 
+      : pathname.startsWith(item.href);
+  };
 
   return (
-    <Sidebar collapsible="offcanvas" className="lg:border-r-0!" {...props}>
+    <Sidebar collapsible="offcanvas" className="font-sans lg:border-r-0!" {...props}>
       <SidebarHeader className="p-3 sm:p-4 lg:p-5 pb-0">
         <div className="flex items-center gap-2">
           <div className="flex size-5 items-center justify-center rounded bg-gradient-to-b from-black to-[#760000] text-white">
             <Atom className="size-3" />
           </div>
-          <span className="font-semibold text-base sm:text-lg bg-white">Jumbo Core</span>
+          <span className="font-semibold text-base sm:text-lg">Jumbo Core</span>
         </div>
       </SidebarHeader>
 
@@ -121,9 +155,7 @@ export function DashboardSidebar({
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => {
-                const isActive = item.href === "/" 
-                  ? pathname === "/" 
-                  : pathname.startsWith(item.href);
+                const isActive = getIsActive(item);
 
                 return (
                   <SidebarMenuItem key={item.title}>
@@ -187,42 +219,58 @@ export function DashboardSidebar({
 
        
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors">
-              <Avatar className="size-7 sm:size-8">
-                <AvatarImage src="https://api.dicebear.com/9.x/glass/svg?seed=john" />
-                <AvatarFallback className="text-xs">JC</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-xs sm:text-sm">John Cornor</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                  Johncornor@mail.com
-                </p>
+        {mounted && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors">
+                <Avatar className="size-7 sm:size-8">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback className="text-xs">{userInitials}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-xs sm:text-sm truncate">{userName}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                    {userEmail}
+                  </p>
+                </div>
+                <ChevronsUpDown className="size-4 text-muted-foreground shrink-0" />
               </div>
-              <ChevronsUpDown className="size-4 text-muted-foreground shrink-0" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              <DropdownMenuItem>
+                <UserCircle className="size-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <CreditCard className="size-4 mr-2" />
+                Billing
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="size-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
+                <LogOut className="size-4 mr-2" />
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {!mounted && (
+          <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg">
+            <Avatar className="size-7 sm:size-8">
+              <AvatarFallback className="text-xs">U</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-xs sm:text-sm truncate">User</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                Loading...
+              </p>
             </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            <DropdownMenuItem>
-              <UserCircle className="size-4 mr-2" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <CreditCard className="size-4 mr-2" />
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="size-4 mr-2" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
-              <LogOut className="size-4 mr-2" />
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <ChevronsUpDown className="size-4 text-muted-foreground shrink-0" />
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

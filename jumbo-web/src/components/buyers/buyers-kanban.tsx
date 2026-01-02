@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { LeadWithRelations } from "@/types";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 interface BuyersKanbanProps {
   data: LeadWithRelations[];
@@ -98,11 +99,42 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
     setTasks(initialData);
   }, [initialData]);
 
-  // Handle drag and drop status updates - simplistic optimisic update
-  // In a real app, you'd call an API here to update the status in DB
-  const handleDataChange = (newData: KanbanBuyer[]) => {
-      setTasks(newData);
-      // TODO: Implement server action to update status
+  // Handle drag and drop status updates
+  const handleDataChange = async (newData: KanbanBuyer[]) => {
+    setTasks(newData);
+    
+    // Find leads that changed status
+    const statusUpdates = newData
+      .filter((item) => {
+        const original = data.find((l) => l.id === item.id);
+        return original && original.status !== item.column;
+      })
+      .map((item) => ({
+        id: item.id,
+        status: item.column,
+      }));
+
+    // Update each changed lead
+    for (const update of statusUpdates) {
+      try {
+        const response = await fetch(`/api/v1/leads/${update.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: update.status }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to update lead status");
+        }
+      } catch (error) {
+        console.error("Error updating lead status:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update lead status");
+        // Revert to original data
+        setTasks(initialData);
+        break; // Stop processing other updates if one fails
+      }
+    }
   };
 
   return (

@@ -1,26 +1,10 @@
 "use server";
 
-import { db } from "@/lib/db";
-import {
-  buildings,
-  units,
-  listings,
-  leads,
-  profiles,
-  visits,
-  visitTours,
-  communications,
-  creditLedger,
-  creditRules,
-  sellerLeads,
-} from "@/lib/db/schema";
-import { eq, and, sql, desc, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
   createLeadRequestSchema,
   updateLeadStatusSchema,
   assignLeadSchema,
-  createListingRequestSchema,
   updateListingStatusSchema,
   createTourRequestSchema,
   createVisitRequestSchema,
@@ -28,16 +12,21 @@ import {
   updateVisitStatusSchema,
   updateVisitSchema,
   createCommunicationSchema,
-  createSellerSchema,
   createSellerLeadSchema,
+  createNoteSchema,
+  updateNoteSchema,
+  queryNotesSchema,
+  uploadMediaSchema,
+  updateMediaOrderSchema,
+  queryMediaSchema,
 } from "@/lib/validations";
 import { z } from "zod";
 import { logActivity, computeChanges } from "@/lib/audit";
+import { requirePermission } from "@/lib/auth";
 import type {
   CreateLeadRequest,
   UpdateLeadStatus,
   AssignLead,
-  CreateListingRequest,
   UpdateListingStatus,
   CreateTourRequest,
   CreateVisitRequest,
@@ -46,6 +35,20 @@ import type {
   UpdateVisit,
   CreateCommunication,
 } from "@/lib/validations";
+
+// Import services
+import * as buildingService from "@/services/building.service";
+import * as unitService from "@/services/unit.service";
+import * as listingService from "@/services/listing.service";
+import * as leadService from "@/services/lead.service";
+import * as profileService from "@/services/profile.service";
+import * as visitService from "@/services/visit.service";
+import * as tourService from "@/services/tour.service";
+import * as communicationService from "@/services/communication.service";
+import * as sellerLeadService from "@/services/seller-lead.service";
+import * as noteService from "@/services/note.service";
+import * as mediaService from "@/services/media.service";
+import * as coinService from "@/services/coin.service";
 
 // ============================================
 // TYPES & HELPERS
@@ -62,30 +65,27 @@ type ActionResult<T = unknown> =
 /**
  * Create a new building
  */
-export async function createBuilding(
-  data: {
-    name: string;
-    locality?: string;
-    city?: string;
-    latitude?: number;
-    longitude?: number;
-    amenities?: Record<string, boolean>;
-    waterSource?: string;
-  }
-): Promise<ActionResult<{ id: string }>> {
+export async function createBuilding(data: {
+  name: string;
+  locality?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  amenities?: Record<string, boolean>;
+  waterSource?: string;
+}): Promise<ActionResult<{ id: string }>> {
   try {
-    const [building] = await db
-      .insert(buildings)
-      .values({
-        name: data.name,
-        locality: data.locality,
-        city: data.city,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        amenitiesJson: data.amenities,
-        waterSource: data.waterSource,
-      })
-      .returning({ id: buildings.id });
+    await requirePermission("buildings:create");
+
+    const building = await buildingService.createBuilding({
+      name: data.name,
+      locality: data.locality,
+      city: data.city,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      amenitiesJson: data.amenities,
+      waterSource: data.waterSource,
+    });
 
     await logActivity({
       entityType: "building",
@@ -114,28 +114,25 @@ export async function createBuilding(
 /**
  * Create a new unit
  */
-export async function createUnit(
-  data: {
-    buildingId: string;
-    unitNumber?: string;
-    bhk: number;
-    floorNumber?: number;
-    carpetArea?: number;
-    ownerId?: string;
-  }
-): Promise<ActionResult<{ id: string }>> {
+export async function createUnit(data: {
+  buildingId: string;
+  unitNumber?: string;
+  bhk: number;
+  floorNumber?: number;
+  carpetArea?: number;
+  ownerId?: string;
+}): Promise<ActionResult<{ id: string }>> {
   try {
-    const [unit] = await db
-      .insert(units)
-      .values({
-        buildingId: data.buildingId,
-        unitNumber: data.unitNumber,
-        bhk: data.bhk,
-        floorNumber: data.floorNumber,
-        carpetArea: data.carpetArea,
-        ownerId: data.ownerId,
-      })
-      .returning({ id: units.id });
+    await requirePermission("units:create");
+
+    const unit = await unitService.createUnit({
+      buildingId: data.buildingId,
+      unitNumber: data.unitNumber,
+      bhk: data.bhk,
+      floorNumber: data.floorNumber,
+      carpetArea: data.carpetArea,
+      ownerId: data.ownerId,
+    });
 
     await logActivity({
       entityType: "unit",
@@ -165,78 +162,59 @@ export async function createUnit(
  * Upsert listing (creates Building → Unit → Listing in a transaction)
  * This is the main action for the listing wizard
  */
-export async function upsertListing(
-  data: CreateListingRequest & { listingAgentId?: string; description?: string; images?: string[]; amenities?: string[] }
-): Promise<ActionResult<{ id: string }>> {
+export async function upsertListing(data: {
+  building:
+    | { id: string }
+    | {
+        name: string;
+        locality?: string;
+        city?: string;
+        latitude?: number;
+        longitude?: number;
+        amenities?: Record<string, boolean>;
+        waterSource?: string;
+      };
+  unit: {
+    unitNumber?: string;
+    bhk: number;
+    floorNumber?: number;
+    carpetArea?: number;
+    ownerId?: string;
+  };
+  askingPrice: number;
+  listingAgentId?: string;
+  description?: string;
+  images?: string[];
+  amenities?: string[];
+  externalIds?: {
+    housing_id?: string;
+    magicbricks_id?: string;
+    "99acres_id"?: string;
+  };
+}): Promise<ActionResult<{ id: string }>> {
   try {
-    let buildingId: string;
-    let unitId: string;
+    const { profile } = await requirePermission("listings:create");
 
-    // Use transaction for atomicity
-    const result = await db.transaction(async (tx) => {
-      // Step 1: Handle building (create or use existing)
-      if ("id" in data.building) {
-        buildingId = data.building.id;
-      } else {
-        const [building] = await tx
-          .insert(buildings)
-          .values({
-            name: data.building.name,
-            locality: data.building.locality,
-            city: data.building.city,
-            latitude: data.building.latitude,
-            longitude: data.building.longitude,
-            amenitiesJson: data.building.amenities,
-            waterSource: data.building.waterSource,
-          })
-          .returning({ id: buildings.id });
-        buildingId = building.id;
-      }
+    // Set listing agent ID if not provided
+    const listingAgentId = data.listingAgentId ?? profile.id;
 
-      // Step 2: Create unit
-      const [unit] = await tx
-        .insert(units)
-        .values({
-          buildingId,
-          unitNumber: data.unit.unitNumber,
-          bhk: data.unit.bhk,
-          floorNumber: data.unit.floorNumber,
-          carpetArea: data.unit.carpetArea,
-          ownerId: data.unit.ownerId,
-        })
-        .returning({ id: units.id });
-      unitId = unit.id;
-
-      // Step 3: Create listing
-      const [listing] = await tx
-        .insert(listings)
-        .values({
-          unitId,
-          listingAgentId: data.listingAgentId,
-          askingPrice: data.askingPrice.toString(),
-          description: data.description,
-          images: data.images || [],
-          amenitiesJson: data.amenities || [],
-          externalIds: data.externalIds,
-          status: "draft",
-        })
-        .returning({ id: listings.id });
-
-      return listing.id;
+    const listing = await listingService.upsertListing({
+      ...data,
+      listingAgentId,
     });
 
     await logActivity({
       entityType: "listing",
-      entityId: result,
+      entityId: listing.id,
       action: "create",
       changes: computeChanges(null, data),
     });
 
     revalidatePath("/listings");
-    revalidatePath(`/listings/${result}`);
+    revalidatePath(`/listings/${listing.id}`);
     return {
       success: true,
-      data: { id: result },
+      data: { id: listing.id },
       message: "Listing created successfully",
     };
   } catch (error) {
@@ -258,13 +236,11 @@ export async function updateListingStatus(
   data: UpdateListingStatus
 ): Promise<ActionResult> {
   try {
+    await requirePermission("listings:update");
     const validatedData = updateListingStatusSchema.parse(data);
 
     // Get current listing for audit
-    const currentListing = await db.query.listings.findFirst({
-      where: eq(listings.id, id),
-    });
-
+    const currentListing = await listingService.getListingById(id);
     if (!currentListing) {
       return {
         success: false,
@@ -273,14 +249,7 @@ export async function updateListingStatus(
       };
     }
 
-    await db
-      .update(listings)
-      .set({
-        status: validatedData.status,
-        updatedAt: new Date(),
-        publishedAt: validatedData.status === "active" ? new Date() : currentListing.publishedAt,
-      })
-      .where(eq(listings.id, id));
+    await listingService.updateListingStatus(id, validatedData.status);
 
     await logActivity({
       entityType: "listing",
@@ -317,51 +286,35 @@ export async function createLead(
   data: CreateLeadRequest
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    await requirePermission("leads:create");
     const validatedData = createLeadRequestSchema.parse(data);
 
-    // Check if profile exists by phone
-    let profile = await db.query.profiles.findFirst({
-      where: eq(profiles.phone, validatedData.profile.phone),
+    const lead = await leadService.createLeadWithProfile({
+      profile: {
+        fullName: validatedData.profile.fullName,
+        phone: validatedData.profile.phone,
+        email: validatedData.profile.email ?? undefined,
+      },
+      leadId: validatedData.leadId ?? undefined,
+      source: validatedData.source ?? undefined,
+      status: validatedData.status ?? "new",
+      externalId: validatedData.externalId ?? undefined,
+      secondaryPhone: validatedData.secondaryPhone ?? undefined,
+      sourceListingId: validatedData.sourceListingId ?? undefined,
+      dropReason: validatedData.dropReason ?? undefined,
+      locality: validatedData.locality ?? undefined,
+      zone: validatedData.zone ?? undefined,
+      pipeline: validatedData.pipeline,
+      referredBy: validatedData.referredBy ?? undefined,
+      testListingId: validatedData.testListingId ?? undefined,
+      requirements: validatedData.requirements,
+      preferences: validatedData.preferences,
+      assignedAgentId: validatedData.assignedAgentId ?? undefined,
     });
 
-    // Create profile if not exists
-    if (!profile) {
-      const [newProfile] = await db
-        .insert(profiles)
-        .values({
-          fullName: validatedData.profile.fullName,
-          phone: validatedData.profile.phone,
-          email: validatedData.profile.email || null,
-        })
-        .returning({ id: profiles.id });
-      profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, newProfile.id),
-      });
-    }
-
-    if (!profile) {
-      return {
-        success: false,
-        error: "PROFILE_CREATE_FAILED",
-        message: "Failed to create or find profile",
-      };
-    }
-
-    // Create lead
-    const [lead] = await db
-      .insert(leads)
-      .values({
-        profileId: profile.id,
-        source: validatedData.source,
-        externalId: validatedData.externalId,
-        requirementJson: validatedData.requirements || null,
-        status: "new",
-      })
-      .returning({ id: leads.id });
-
     // Auto-assign using round-robin if no agent specified
-    if (!validatedData.requirements) {
-      await assignLeadRoundRobin(lead.id);
+    if (!validatedData.assignedAgentId) {
+      await leadService.assignLeadRoundRobin(lead.id);
     }
 
     await logActivity({
@@ -380,68 +333,13 @@ export async function createLead(
     };
   } catch (error) {
     console.error("Error creating lead:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to create lead";
     return {
       success: false,
       error: "LEAD_CREATE_FAILED",
-      message: "Failed to create lead",
+      message: errorMessage,
       details: error,
     };
-  }
-}
-
-/**
- * Round-robin lead assignment helper
- * Assigns lead to next available buyer_agent based on territory
- */
-async function assignLeadRoundRobin(leadId: string): Promise<string | null> {
-  try {
-    // Get all active buyer agents
-    const agents = await db.query.profiles.findMany({
-      where: and(
-        eq(profiles.role, "buyer_agent"),
-        isNull(profiles.deletedAt)
-      ),
-      orderBy: [desc(profiles.createdAt)],
-    });
-
-    if (agents.length === 0) {
-      return null;
-    }
-
-    // Get the agent with the least assigned leads
-    const agentLeadCounts = await Promise.all(
-      agents.map(async (agent) => {
-        const count = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(leads)
-          .where(
-            and(
-              eq(leads.assignedAgentId, agent.id),
-              isNull(leads.deletedAt)
-            )
-          );
-        return {
-          agentId: agent.id,
-          count: Number(count[0]?.count ?? 0),
-        };
-      })
-    );
-
-    // Sort by count and pick the one with least leads
-    agentLeadCounts.sort((a, b) => a.count - b.count);
-    const assignedAgentId = agentLeadCounts[0]?.agentId;
-
-    if (assignedAgentId) {
-      await db
-        .update(leads)
-        .set({ assignedAgentId })
-        .where(eq(leads.id, leadId));
-    }
-
-    return assignedAgentId || null;
-  } catch (error) {
-    console.error("Error in round-robin assignment:", error);
-    return null;
   }
 }
 
@@ -453,12 +351,10 @@ export async function assignLead(
   data: AssignLead
 ): Promise<ActionResult> {
   try {
+    await requirePermission("leads:assign");
     const validatedData = assignLeadSchema.parse(data);
 
-    const currentLead = await db.query.leads.findFirst({
-      where: eq(leads.id, leadId),
-    });
-
+    const currentLead = await leadService.getLeadById(leadId);
     if (!currentLead) {
       return {
         success: false,
@@ -467,10 +363,7 @@ export async function assignLead(
       };
     }
 
-    await db
-      .update(leads)
-      .set({ assignedAgentId: validatedData.agentId })
-      .where(eq(leads.id, leadId));
+    await leadService.assignLead(leadId, validatedData.agentId);
 
     await logActivity({
       entityType: "lead",
@@ -504,12 +397,10 @@ export async function updateLeadStatus(
   data: UpdateLeadStatus
 ): Promise<ActionResult> {
   try {
+    await requirePermission("leads:update");
     const validatedData = updateLeadStatusSchema.parse(data);
 
-    const currentLead = await db.query.leads.findFirst({
-      where: eq(leads.id, id),
-    });
-
+    const currentLead = await leadService.getLeadById(id);
     if (!currentLead) {
       return {
         success: false,
@@ -518,13 +409,7 @@ export async function updateLeadStatus(
       };
     }
 
-    await db
-      .update(leads)
-      .set({
-        status: validatedData.status,
-        lastContactedAt: validatedData.status === "contacted" ? new Date() : currentLead.lastContactedAt,
-      })
-      .where(eq(leads.id, id));
+    await leadService.updateLeadStatus(id, validatedData.status);
 
     await logActivity({
       entityType: "lead",
@@ -559,27 +444,16 @@ export async function logCommunication(
   try {
     const validatedData = createCommunicationSchema.parse(data);
 
-    const [communication] = await db
-      .insert(communications)
-      .values({
-        leadId: validatedData.leadId || null,
-        sellerLeadId: validatedData.sellerLeadId || null,
-        agentId: validatedData.agentId,
-        channel: validatedData.channel,
-        direction: validatedData.direction,
-        content: validatedData.content,
-        recordingUrl: validatedData.recordingUrl,
-        metadata: validatedData.metadata || null,
-      })
-      .returning({ id: communications.id });
-
-    // Update lastContactedAt on lead if applicable
-    if (validatedData.leadId) {
-      await db
-        .update(leads)
-        .set({ lastContactedAt: new Date() })
-        .where(eq(leads.id, validatedData.leadId));
-    }
+    const communication = await communicationService.logCommunication({
+      leadId: validatedData.leadId ?? undefined,
+      sellerLeadId: validatedData.sellerLeadId ?? undefined,
+      agentId: validatedData.agentId,
+      channel: validatedData.channel,
+      direction: validatedData.direction,
+      content: validatedData.content ?? undefined,
+      recordingUrl: validatedData.recordingUrl ?? undefined,
+      metadata: validatedData.metadata ?? undefined,
+    });
 
     revalidatePath("/buyers");
     if (validatedData.leadId) {
@@ -602,7 +476,7 @@ export async function logCommunication(
 }
 
 /**
- * Update buyer (lead + profile) - Refactored with type safety
+ * Update buyer (lead + profile)
  */
 export async function updateBuyer(
   id: string,
@@ -619,12 +493,8 @@ export async function updateBuyer(
   }
 ): Promise<ActionResult> {
   try {
-    const lead = await db.query.leads.findFirst({
-      where: eq(leads.id, id),
-      with: { profile: true },
-    });
-
-    if (!lead) {
+    const currentLead = await leadService.getLeadByIdWithRelations(id);
+    if (!currentLead) {
       return {
         success: false,
         error: "LEAD_NOT_FOUND",
@@ -632,52 +502,15 @@ export async function updateBuyer(
       };
     }
 
-    // Update lead
-    const leadUpdates: Partial<typeof leads.$inferInsert> = {};
-    if (data.status) leadUpdates.status = data.status;
-    if (data.assignedAgentId) leadUpdates.assignedAgentId = data.assignedAgentId;
-    if (data.budget_min !== undefined || data.budget_max !== undefined || data.bhk || data.localities) {
-      leadUpdates.requirementJson = {
-        ...(lead.requirementJson as Record<string, unknown> || {}),
-        ...(data.budget_min !== undefined && { budget_min: data.budget_min }),
-        ...(data.budget_max !== undefined && { budget_max: data.budget_max }),
-        ...(data.bhk && { bhk: data.bhk }),
-        ...(data.localities && { localities: data.localities }),
-      };
-    }
-
-    if (Object.keys(leadUpdates).length > 0) {
-      await db.update(leads).set(leadUpdates).where(eq(leads.id, id));
-    }
-
-    // Update profile if provided
-    if (lead.profileId && (data.name || data.email || data.mobile)) {
-      const profileUpdates: Partial<typeof profiles.$inferInsert> = {};
-      if (data.name) profileUpdates.fullName = data.name;
-      if (data.email) profileUpdates.email = data.email;
-      if (data.mobile) profileUpdates.phone = data.mobile;
-
-      await db.update(profiles).set(profileUpdates).where(eq(profiles.id, lead.profileId));
-    }
+    await leadService.updateLeadWithProfile(id, data);
 
     // Build changes object for audit
     const changes: Record<string, { old: unknown; new: unknown }> = {};
-    if (data.status && data.status !== lead.status) {
-      changes.status = { old: lead.status, new: data.status };
+    if (data.status && data.status !== currentLead.status) {
+      changes.status = { old: currentLead.status, new: data.status };
     }
-    if (data.assignedAgentId && data.assignedAgentId !== lead.assignedAgentId) {
-      changes.assignedAgentId = { old: lead.assignedAgentId, new: data.assignedAgentId };
-    }
-    if (lead.profile) {
-      if (data.name && data.name !== lead.profile.fullName) {
-        changes.fullName = { old: lead.profile.fullName, new: data.name };
-      }
-      if (data.email && data.email !== lead.profile.email) {
-        changes.email = { old: lead.profile.email, new: data.email };
-      }
-      if (data.mobile && data.mobile !== lead.profile.phone) {
-        changes.phone = { old: lead.profile.phone, new: data.mobile };
-      }
+    if (data.assignedAgentId && data.assignedAgentId !== currentLead.assignedAgentId) {
+      changes.assignedAgentId = { old: currentLead.assignedAgentId, new: data.assignedAgentId };
     }
 
     if (Object.keys(changes).length > 0) {
@@ -719,28 +552,24 @@ export async function createTour(
   try {
     const validatedData = createTourRequestSchema.parse(data);
 
-    // Create tour
     // Convert Date to YYYY-MM-DD string for date column
-    const tourDateStr = validatedData.tourDate instanceof Date 
-      ? validatedData.tourDate.toISOString().split('T')[0]
-      : validatedData.tourDate;
+    const tourDateStr =
+      validatedData.tourDate instanceof Date
+        ? validatedData.tourDate.toISOString().split("T")[0]
+        : validatedData.tourDate;
 
-    const [tour] = await db
-      .insert(visitTours)
-      .values({
-        dispatchAgentId: validatedData.dispatchAgentId,
-        fieldAgentId: validatedData.fieldAgentId,
-        tourDate: tourDateStr,
-        optimizedRoute: validatedData.optimizedRoute || null,
-        status: "planned",
-      })
-      .returning({ id: visitTours.id });
+    const tour = await tourService.createTour({
+      dispatchAgentId: validatedData.dispatchAgentId,
+      fieldAgentId: validatedData.fieldAgentId,
+      tourDate: tourDateStr,
+      optimizedRoute: validatedData.optimizedRoute,
+      status: "planned",
+    });
 
     // Link visits to tour
-    await db
-      .update(visits)
-      .set({ tourId: tour.id })
-      .where(sql`${visits.id} = ANY(${validatedData.visitIds})`);
+    if (validatedData.visitIds && validatedData.visitIds.length > 0) {
+      await tourService.linkVisitsToTour(tour.id, validatedData.visitIds);
+    }
 
     await logActivity({
       entityType: "visit_tour",
@@ -773,22 +602,16 @@ export async function createVisit(
   data: CreateVisitRequest
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    await requirePermission("visits:create");
     const validatedData = createVisitRequestSchema.parse(data);
 
-    // Generate 4-digit OTP
-    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-
-    const [visit] = await db
-      .insert(visits)
-      .values({
-        leadId: validatedData.leadId,
-        listingId: validatedData.listingId,
-        scheduledAt: validatedData.scheduledAt || null,
-        tourId: validatedData.tourId || null,
-        otpCode,
-        status: "scheduled",
-      })
-      .returning({ id: visits.id });
+    const visit = await visitService.createVisit({
+      leadId: validatedData.leadId,
+      listingId: validatedData.listingId,
+      scheduledAt: validatedData.scheduledAt,
+      tourId: validatedData.tourId,
+      status: "scheduled",
+    });
 
     await logActivity({
       entityType: "visit",
@@ -801,7 +624,7 @@ export async function createVisit(
     return {
       success: true,
       data: { id: visit.id },
-      message: `Visit created successfully. OTP: ${otpCode}`,
+      message: `Visit created successfully. OTP: ${visit.otpCode}`,
     };
   } catch (error) {
     console.error("Error creating visit:", error);
@@ -823,10 +646,7 @@ export async function verifyVisitOTP(
   try {
     const validatedData = verifyVisitOTPSchema.parse(data);
 
-    const visit = await db.query.visits.findFirst({
-      where: eq(visits.id, validatedData.visitId),
-    });
-
+    const visit = await visitService.getVisitById(validatedData.visitId);
     if (!visit) {
       return {
         success: false,
@@ -835,44 +655,11 @@ export async function verifyVisitOTP(
       };
     }
 
-    if (!visit.otpCode) {
-      return {
-        success: false,
-        error: "OTP_NOT_SET",
-        message: "OTP not set for this visit",
-      };
-    }
-
-    if (visit.otpCode !== validatedData.otpCode) {
-      return {
-        success: false,
-        error: "OTP_MISMATCH",
-        message: "Invalid OTP code",
-      };
-    }
-
-    // Mark visit as completed
-    await db
-      .update(visits)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        feedbackText: validatedData.feedbackText || null,
-        feedbackRating: validatedData.feedbackRating || null,
-        agentLatitude: validatedData.geoData?.latitude || null,
-        agentLongitude: validatedData.geoData?.longitude || null,
-      })
-      .where(eq(visits.id, validatedData.visitId));
-
-    // Award coins to visit agent (if tour exists)
-    if (visit.tourId) {
-      const tour = await db.query.visitTours.findFirst({
-        where: eq(visitTours.id, visit.tourId),
-      });
-      if (tour?.fieldAgentId) {
-        await awardCoins(tour.fieldAgentId, "visit_completed", visit.id);
-      }
-    }
+    await visitService.verifyVisitOTP(
+      validatedData.visitId,
+      validatedData.otpCode,
+      validatedData.geoData
+    );
 
     await logActivity({
       entityType: "visit",
@@ -895,7 +682,7 @@ export async function verifyVisitOTP(
     return {
       success: false,
       error: "VISIT_VERIFY_FAILED",
-      message: "Failed to verify visit OTP",
+      message: error instanceof Error ? error.message : "Failed to verify visit OTP",
       details: error,
     };
   }
@@ -911,10 +698,7 @@ export async function updateVisitStatus(
   try {
     const validatedData = updateVisitStatusSchema.parse(data);
 
-    const currentVisit = await db.query.visits.findFirst({
-      where: eq(visits.id, id),
-    });
-
+    const currentVisit = await visitService.getVisitById(id);
     if (!currentVisit) {
       return {
         success: false,
@@ -923,45 +707,19 @@ export async function updateVisitStatus(
       };
     }
 
-    await db
-      .update(visits)
-      .set({
-        status: validatedData.status,
-        feedbackText: validatedData.feedbackText || null,
-        feedbackRating: validatedData.feedbackRating || null,
-      })
-      .where(eq(visits.id, id));
+    await visitService.updateVisitStatus(
+      id,
+      validatedData.status,
+      validatedData.feedbackText,
+      validatedData.feedbackRating
+    );
 
-    // Handle no-show penalty
-    if (validatedData.status === "no_show" && currentVisit.tourId) {
-      const tour = await db.query.visitTours.findFirst({
-        where: eq(visitTours.id, currentVisit.tourId),
-      });
-      if (tour?.fieldAgentId) {
-        await awardCoins(tour.fieldAgentId, "visit_no_show", id);
-      }
-    }
-
-    // Build changes object for audit
-    const statusChanges: Record<string, { old: unknown; new: unknown }> = {};
-    if (validatedData.status !== currentVisit.status) {
-      statusChanges.status = { old: currentVisit.status, new: validatedData.status };
-    }
-    if (validatedData.feedbackText !== undefined && validatedData.feedbackText !== currentVisit.feedbackText) {
-      statusChanges.feedbackText = { old: currentVisit.feedbackText, new: validatedData.feedbackText };
-    }
-    if (validatedData.feedbackRating !== undefined && validatedData.feedbackRating !== currentVisit.feedbackRating) {
-      statusChanges.feedbackRating = { old: currentVisit.feedbackRating, new: validatedData.feedbackRating };
-    }
-
-    if (Object.keys(statusChanges).length > 0) {
-      await logActivity({
-        entityType: "visit",
-        entityId: id,
-        action: "update",
-        changes: statusChanges,
-      });
-    }
+    await logActivity({
+      entityType: "visit",
+      entityId: id,
+      action: "update",
+      changes: { status: { old: currentVisit.status, new: validatedData.status } },
+    });
 
     revalidatePath("/visits");
     revalidatePath(`/visits/${id}`);
@@ -981,7 +739,7 @@ export async function updateVisitStatus(
 }
 
 /**
- * Update visit - Refactored with type safety
+ * Update visit
  */
 export async function updateVisit(
   id: string,
@@ -990,10 +748,7 @@ export async function updateVisit(
   try {
     const validatedData = updateVisitSchema.parse(data);
 
-    const currentVisit = await db.query.visits.findFirst({
-      where: eq(visits.id, id),
-    });
-
+    const currentVisit = await visitService.getVisitById(id);
     if (!currentVisit) {
       return {
         success: false,
@@ -1002,39 +757,19 @@ export async function updateVisit(
       };
     }
 
-    await db
-      .update(visits)
-      .set({
-        scheduledAt: validatedData.scheduledAt || undefined,
-        status: validatedData.status,
-        feedbackText: validatedData.feedbackText,
-        feedbackRating: validatedData.feedbackRating,
-      })
-      .where(eq(visits.id, id));
+    await visitService.updateVisit(id, {
+      scheduledAt: validatedData.scheduledAt,
+      status: validatedData.status,
+      feedbackText: validatedData.feedbackText,
+      feedbackRating: validatedData.feedbackRating,
+    });
 
-    // Build changes object for audit
-    const visitUpdateChanges: Record<string, { old: unknown; new: unknown }> = {};
-    if (validatedData.scheduledAt !== undefined && validatedData.scheduledAt?.getTime() !== currentVisit.scheduledAt?.getTime()) {
-      visitUpdateChanges.scheduledAt = { old: currentVisit.scheduledAt, new: validatedData.scheduledAt };
-    }
-    if (validatedData.status && validatedData.status !== currentVisit.status) {
-      visitUpdateChanges.status = { old: currentVisit.status, new: validatedData.status };
-    }
-    if (validatedData.feedbackText !== undefined && validatedData.feedbackText !== currentVisit.feedbackText) {
-      visitUpdateChanges.feedbackText = { old: currentVisit.feedbackText, new: validatedData.feedbackText };
-    }
-    if (validatedData.feedbackRating !== undefined && validatedData.feedbackRating !== currentVisit.feedbackRating) {
-      visitUpdateChanges.feedbackRating = { old: currentVisit.feedbackRating, new: validatedData.feedbackRating };
-    }
-
-    if (Object.keys(visitUpdateChanges).length > 0) {
-      await logActivity({
-        entityType: "visit",
-        entityId: id,
-        action: "update",
-        changes: visitUpdateChanges,
-      });
-    }
+    await logActivity({
+      entityType: "visit",
+      entityId: id,
+      action: "update",
+      changes: computeChanges(currentVisit, validatedData),
+    });
 
     revalidatePath(`/visits/${id}`);
     revalidatePath("/visits");
@@ -1067,52 +802,19 @@ export async function awardCoins(
   notes?: string
 ): Promise<ActionResult<{ newBalance: number }>> {
   try {
-    // Get coin value from rules
-    const rule = await db.query.creditRules.findFirst({
-      where: eq(creditRules.actionType, actionType),
-    });
-
-    if (!rule) {
-      return {
-        success: false,
-        error: "COIN_RULE_NOT_FOUND",
-        message: `No coin rule found for action: ${actionType}`,
-      };
-    }
-
-    // Create ledger entry
-    await db.insert(creditLedger).values({
-      agentId,
-      amount: rule.coinValue,
-      actionType,
-      referenceId: referenceId || null,
-      notes: notes || null,
-    });
-
-    // Update cached balance in profile
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, agentId),
-    });
-
-    if (profile) {
-      const newBalance = (profile.totalCoins || 0) + rule.coinValue;
-      await db
-        .update(profiles)
-        .set({ totalCoins: newBalance })
-        .where(eq(profiles.id, agentId));
-    }
+    const result = await coinService.awardCoins(agentId, actionType, referenceId, notes);
 
     return {
       success: true,
-      data: { newBalance: (profile?.totalCoins || 0) + rule.coinValue },
-      message: `Awarded ${rule.coinValue} coins for ${actionType}`,
+      data: { newBalance: result.newBalance },
+      message: `Awarded ${result.coinsAwarded} coins for ${actionType}`,
     };
   } catch (error) {
     console.error("Error awarding coins:", error);
     return {
       success: false,
       error: "COIN_AWARD_FAILED",
-      message: "Failed to award coins",
+      message: error instanceof Error ? error.message : "Failed to award coins",
       details: error,
     };
   }
@@ -1123,7 +825,7 @@ export async function awardCoins(
 // ============================================
 
 /**
- * Update seller (profile) - Refactored with type safety
+ * Update seller (profile)
  */
 export async function updateSeller(
   id: string,
@@ -1134,10 +836,7 @@ export async function updateSeller(
   }
 ): Promise<ActionResult> {
   try {
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, id),
-    });
-
+    const profile = await profileService.getProfileById(id);
     if (!profile) {
       return {
         success: false,
@@ -1146,18 +845,17 @@ export async function updateSeller(
       };
     }
 
-    const updates: Partial<typeof profiles.$inferInsert> = {};
-    if (data.name) updates.fullName = data.name;
-    if (data.email) updates.email = data.email;
-    if (data.mobile) updates.phone = data.mobile;
-
-    await db.update(profiles).set(updates).where(eq(profiles.id, id));
+    await profileService.updateProfile(id, {
+      ...(data.name && { fullName: data.name }),
+      ...(data.email && { email: data.email }),
+      ...(data.mobile && { phone: data.mobile }),
+    });
 
     await logActivity({
       entityType: "profile",
       entityId: id,
       action: "update",
-      changes: computeChanges(profile, updates),
+      changes: computeChanges(profile, data),
     });
 
     revalidatePath(`/sellers/${id}`);
@@ -1184,26 +882,27 @@ export async function createSellerLead(
   data: z.infer<typeof createSellerLeadSchema>
 ): Promise<ActionResult<{ id: string }>> {
   try {
+    const { user } = await requirePermission("seller_leads:create");
     const validatedData = createSellerLeadSchema.parse(data);
 
-    const [sellerLead] = await db
-      .insert(sellerLeads)
-      .values({
-        name: validatedData.name,
-        phone: validatedData.phone,
-        email: validatedData.email || null,
-        status: validatedData.status,
-        source: validatedData.source,
-        sourceUrl: validatedData.sourceUrl || null,
-        referredById: validatedData.referredById || null,
-        buildingId: validatedData.buildingId || null,
-        unitId: validatedData.unitId || null,
-        assignedToId: validatedData.assignedToId || null,
-        followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : null,
-        isNri: validatedData.isNri,
-        notes: validatedData.notes || null,
-      })
-      .returning({ id: sellerLeads.id });
+    const sellerLead = await sellerLeadService.createSellerLead({
+      name: validatedData.name,
+      phone: validatedData.phone,
+      email: validatedData.email,
+      status: validatedData.status,
+      source: validatedData.source,
+      sourceUrl: validatedData.sourceUrl,
+      sourceListingUrl: validatedData.sourceListingUrl,
+      referredById: validatedData.referredById,
+      buildingId: validatedData.buildingId,
+      unitId: validatedData.unitId,
+      assignedToId: validatedData.assignedToId,
+      followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : null,
+      isNri: validatedData.isNri,
+      secondaryPhone: validatedData.secondaryPhone,
+      dropReason: validatedData.dropReason,
+      createdById: user.id,
+    });
 
     await logActivity({
       entityType: "seller_lead",
@@ -1228,3 +927,418 @@ export async function createSellerLead(
     };
   }
 }
+
+// ============================================
+// NOTES MANAGEMENT
+// ============================================
+
+/**
+ * Create a new note
+ */
+export async function createNote(
+  entityType: string,
+  entityId: string,
+  content: string
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const { user } = await requirePermission("notes:create");
+
+    const validatedData = createNoteSchema.parse({
+      entityType,
+      entityId,
+      content,
+    });
+
+    const note = await noteService.createNote({
+      entityType: validatedData.entityType,
+      entityId: validatedData.entityId,
+      content: validatedData.content,
+      createdById: user.id,
+    });
+
+    await logActivity({
+      entityType: "note",
+      entityId: note.id,
+      action: "create",
+      changes: computeChanges(null, validatedData),
+    });
+
+    revalidatePath(`/${entityType}s/${entityId}`);
+    return {
+      success: true,
+      data: { id: note.id },
+      message: "Note created successfully",
+    };
+  } catch (error) {
+    console.error("Error creating note:", error);
+    return {
+      success: false,
+      error: "NOTE_CREATE_FAILED",
+      message: "Failed to create note",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Update a note
+ */
+export async function updateNote(
+  noteId: string,
+  content: string
+): Promise<ActionResult> {
+  try {
+    const { user } = await requirePermission("notes:update");
+
+    const existingNote = await noteService.getNoteById(noteId);
+    if (!existingNote) {
+      return {
+        success: false,
+        error: "NOTE_NOT_FOUND",
+        message: "Note not found",
+      };
+    }
+
+    // Check if user owns the note
+    if (existingNote.createdById !== user.id) {
+      return {
+        success: false,
+        error: "FORBIDDEN",
+        message: "You can only edit your own notes",
+      };
+    }
+
+    const validatedData = updateNoteSchema.parse({ content });
+    await noteService.updateNote(noteId, validatedData.content);
+
+    await logActivity({
+      entityType: "note",
+      entityId: noteId,
+      action: "update",
+      changes: computeChanges(existingNote as Record<string, unknown>, { content: validatedData.content }),
+    });
+
+    revalidatePath(`/${existingNote.entityType}s/${existingNote.entityId}`);
+    return {
+      success: true,
+      message: "Note updated successfully",
+    };
+  } catch (error) {
+    console.error("Error updating note:", error);
+    return {
+      success: false,
+      error: "NOTE_UPDATE_FAILED",
+      message: "Failed to update note",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Delete a note (soft delete)
+ */
+export async function deleteNote(noteId: string): Promise<ActionResult> {
+  try {
+    const { user } = await requirePermission("notes:delete");
+
+    const existingNote = await noteService.getNoteById(noteId);
+    if (!existingNote) {
+      return {
+        success: false,
+        error: "NOTE_NOT_FOUND",
+        message: "Note not found",
+      };
+    }
+
+    // Check if user owns the note
+    if (existingNote.createdById !== user.id) {
+      return {
+        success: false,
+        error: "FORBIDDEN",
+        message: "You can only delete your own notes",
+      };
+    }
+
+    await noteService.deleteNote(noteId);
+
+    await logActivity({
+      entityType: "note",
+      entityId: noteId,
+      action: "delete",
+      changes: null,
+    });
+
+    revalidatePath(`/${existingNote.entityType}s/${existingNote.entityId}`);
+    return {
+      success: true,
+      message: "Note deleted successfully",
+    };
+  } catch (error) {
+    console.error("Error deleting note:", error);
+    return {
+      success: false,
+      error: "NOTE_DELETE_FAILED",
+      message: "Failed to delete note",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Get notes by entity
+ */
+export async function getNotesByEntity(
+  entityType: string,
+  entityId: string
+): Promise<ActionResult<Array<Awaited<ReturnType<typeof noteService.getNotesByEntity>>[number]>>> {
+  try {
+    await requirePermission("notes:read");
+
+    const validatedData = queryNotesSchema.parse({
+      entityType,
+      entityId,
+    });
+
+    const notesList = await noteService.getNotesByEntity(
+      validatedData.entityType,
+      validatedData.entityId
+    );
+
+    return {
+      success: true,
+      data: notesList,
+    };
+  } catch (error) {
+    console.error("Error fetching notes:", error);
+    return {
+      success: false,
+      error: "NOTES_FETCH_FAILED",
+      message: "Failed to fetch notes",
+      details: error,
+    };
+  }
+}
+
+// ============================================
+// MEDIA MANAGEMENT
+// ============================================
+
+/**
+ * Upload media item
+ */
+export async function uploadMedia(
+  entityType: string,
+  entityId: string,
+  cloudinaryUrl: string,
+  mediaType: string,
+  tag?: string,
+  order?: number,
+  metadata?: Record<string, unknown>
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const { user } = await requirePermission("media:create");
+
+    const validatedData = uploadMediaSchema.parse({
+      entityType,
+      entityId,
+      cloudinaryUrl,
+      mediaType,
+      tag,
+      order: order ?? 0,
+      metadata,
+    });
+
+    const media = await mediaService.uploadMedia({
+      entityType: validatedData.entityType,
+      entityId: validatedData.entityId,
+      mediaType: validatedData.mediaType as "image" | "video" | "floor_plan" | "document",
+      cloudinaryUrl: validatedData.cloudinaryUrl,
+      cloudinaryPublicId: validatedData.cloudinaryPublicId,
+      tag: validatedData.tag,
+      order: validatedData.order,
+      metadata: validatedData.metadata,
+      uploadedById: user.id,
+    });
+
+    await logActivity({
+      entityType: "media_item",
+      entityId: media.id,
+      action: "create",
+      changes: computeChanges(null, validatedData),
+    });
+
+    revalidatePath(`/${entityType}s/${entityId}`);
+    return {
+      success: true,
+      data: { id: media.id },
+      message: "Media uploaded successfully",
+    };
+  } catch (error) {
+    console.error("Error uploading media:", error);
+    return {
+      success: false,
+      error: "MEDIA_UPLOAD_FAILED",
+      message: "Failed to upload media",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Update media order (bulk)
+ */
+export async function updateMediaOrder(
+  items: Array<{ id: string; order: number }>
+): Promise<ActionResult> {
+  try {
+    await requirePermission("media:update");
+
+    const validatedData = updateMediaOrderSchema.parse({ mediaItems: items });
+    await mediaService.updateMediaOrder(validatedData.mediaItems);
+
+    await logActivity({
+      entityType: "media_item",
+      entityId: "bulk",
+      action: "update",
+      changes: { order: { old: "previous", new: "updated" } },
+    });
+
+    return {
+      success: true,
+      message: "Media order updated successfully",
+    };
+  } catch (error) {
+    console.error("Error updating media order:", error);
+    return {
+      success: false,
+      error: "MEDIA_ORDER_UPDATE_FAILED",
+      message: "Failed to update media order",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Delete media item
+ */
+export async function deleteMedia(mediaId: string): Promise<ActionResult> {
+  try {
+    await requirePermission("media:delete");
+
+    const existingMedia = await mediaService.getMediaById(mediaId);
+    if (!existingMedia) {
+      return {
+        success: false,
+        error: "MEDIA_NOT_FOUND",
+        message: "Media item not found",
+      };
+    }
+
+    await mediaService.deleteMedia(mediaId);
+
+    await logActivity({
+      entityType: "media_item",
+      entityId: mediaId,
+      action: "delete",
+      changes: null,
+    });
+
+    revalidatePath(`/${existingMedia.entityType}s/${existingMedia.entityId}`);
+    return {
+      success: true,
+      message: "Media deleted successfully",
+    };
+  } catch (error) {
+    console.error("Error deleting media:", error);
+    return {
+      success: false,
+      error: "MEDIA_DELETE_FAILED",
+      message: "Failed to delete media",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Get media by entity
+ */
+export async function getMediaByEntity(
+  entityType: string,
+  entityId: string,
+  tag?: string
+): Promise<ActionResult<Array<Awaited<ReturnType<typeof mediaService.getMediaByEntity>>[number]>>> {
+  try {
+    await requirePermission("media:read");
+
+    const validatedData = queryMediaSchema.parse({
+      entityType,
+      entityId,
+      tag,
+    });
+
+    const mediaList = await mediaService.getMediaByEntity(
+      validatedData.entityType,
+      validatedData.entityId,
+      validatedData.tag
+    );
+
+    return {
+      success: true,
+      data: mediaList,
+    };
+  } catch (error) {
+    console.error("Error fetching media:", error);
+    return {
+      success: false,
+      error: "MEDIA_FETCH_FAILED",
+      message: "Failed to fetch media",
+      details: error,
+    };
+  }
+}
+
+// ============================================
+// PHASE 5: INSPECTIONS & CATALOGUES
+// ============================================
+
+// Import and re-export inspection actions
+import {
+  createInspection,
+  updateInspection,
+  completeInspection,
+  getInspectionsByListing,
+} from "./inspections";
+
+export { createInspection, updateInspection, completeInspection, getInspectionsByListing };
+
+// Import and re-export catalogue actions
+import {
+  createCatalogue,
+  updateCatalogue,
+  approveCatalogue,
+  rejectCatalogue,
+  getCataloguesByListing,
+} from "./catalogues";
+
+export { createCatalogue, updateCatalogue, approveCatalogue, rejectCatalogue, getCataloguesByListing };
+
+// Import and re-export offer actions
+import {
+  createOffer,
+  updateOffer,
+  acceptOffer,
+  rejectOffer,
+  counterOffer,
+} from "./offers";
+
+export { createOffer, updateOffer, acceptOffer, rejectOffer, counterOffer };
+
+// Import and re-export visit workflow actions
+import {
+  confirmVisit,
+  cancelVisit,
+  rescheduleVisit,
+  completeVisit,
+} from "./visit-workflows";
+
+export { confirmVisit, cancelVisit, rescheduleVisit, completeVisit };

@@ -21,7 +21,7 @@ interface StatsProps {
 
 export function Stats({ data, className }: StatsProps) {
   return (
-    <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4", className)}>
+    <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4", className)}>
       {data.map((item) => (
         <Card key={item.title} className="p-4 sm:p-6 w-full h-full flex flex-col justify-between">
           <CardContent className="p-0">

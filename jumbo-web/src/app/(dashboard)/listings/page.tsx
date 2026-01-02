@@ -1,32 +1,19 @@
 import { ListingsPageContent } from "@/components/listings/listings-page-content";
-import { db } from "@/lib/db";
-import { listings } from "@/lib/db/schema";
-import { desc, isNull } from "drizzle-orm";
+import * as listingService from "@/services/listing.service";
 import type { ListingWithRelations } from "@/types";
+import { startOfMonth } from "date-fns";
 
 export default async function ListingsPage() {
-  // Fetch listings with relations
-  const listingsData = await db.query.listings.findMany({
-    with: {
-      unit: {
-        with: {
-          building: true,
-          owner: true,
-        },
-      },
-      listingAgent: true,
-    },
-    where: isNull(listings.deletedAt),
-    orderBy: [desc(listings.createdAt)],
-  });
+  // Fetch listings using service layer
+  const listingsResult = await listingService.getListings({ limit: 100 });
 
   // Calculate stats
-  const totalListings = listingsData.length;
-  const activeListings = listingsData.filter((l) => l.status === "active").length;
-  const soldThisMonth = listingsData.filter(
-    (l) => l.status === "sold" && l.createdAt && new Date(l.createdAt).getMonth() === new Date().getMonth()
+  const totalListings = listingsResult.pagination.total;
+  const activeListings = listingsResult.data.filter((l) => l.status === "active").length;
+  const soldThisMonth = listingsResult.data.filter(
+    (l) => l.status === "sold" && l.createdAt && new Date(l.createdAt) >= startOfMonth(new Date())
   ).length;
-  const draftListings = listingsData.filter((l) => l.status === "draft").length;
+  const draftListings = listingsResult.data.filter((l) => l.status === "draft").length;
 
   const stats = {
     totalListings,
@@ -35,5 +22,5 @@ export default async function ListingsPage() {
     draftListings,
   };
 
-  return <ListingsPageContent data={listingsData as ListingWithRelations[]} stats={stats} />;
+  return <ListingsPageContent data={listingsResult.data as ListingWithRelations[]} stats={stats} />;
 }

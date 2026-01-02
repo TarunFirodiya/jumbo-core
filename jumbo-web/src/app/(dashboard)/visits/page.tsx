@@ -1,7 +1,5 @@
 import { VisitsPageContent } from "@/components/visits/visits-page-content";
-import { db } from "@/lib/db";
-import { visits } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import * as visitService from "@/services/visit.service";
 
 // Type matching the API response format
 export type VisitFormatted = {
@@ -28,30 +26,11 @@ export type VisitFormatted = {
 };
 
 export default async function VisitsPage() {
-  // Fetch visits with relations (same query as API route)
-  const visitsData = await db.query.visits.findMany({
-    orderBy: [desc(visits.createdAt)],
-    with: {
-      listing: {
-        with: {
-          unit: {
-            with: {
-              building: true,
-            },
-          },
-        },
-      },
-      lead: {
-        with: {
-          profile: true,
-          assignedAgent: true,
-        },
-      },
-    },
-  });
+  // Fetch visits using service layer
+  const visitsResult = await visitService.getVisits({ limit: 100 });
 
   // Format visits to match the expected structure
-  const formattedVisits: VisitFormatted[] = visitsData.map((v) => {
+  const formattedVisits: VisitFormatted[] = visitsResult.data.map((v) => {
     const buildingName = v.listing?.unit?.building?.name || "Unknown Building";
     const locality = v.listing?.unit?.building?.locality || "";
     const city = v.listing?.unit?.building?.city || "";
@@ -74,8 +53,8 @@ export default async function VisitsPage() {
         iso: v.scheduledAt,
       },
       agent: {
-        name: v.lead?.assignedAgent?.fullName || "Unassigned",
-        image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${v.lead?.assignedAgent?.fullName || "Agent"}`,
+        name: v.lead?.assignedAgent?.fullName || v.assignedVa?.fullName || "Unassigned",
+        image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${v.lead?.assignedAgent?.fullName || v.assignedVa?.fullName || "Agent"}`,
       },
       client: {
         name: v.lead?.profile?.fullName || "Unknown Client",

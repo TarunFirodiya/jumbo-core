@@ -1,27 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sellerLeads } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { sellerLeads, notes } from "@/lib/db/schema";
+import { eq, and, sql, desc, isNull } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { logActivity, computeChanges } from "@/lib/audit";
-import { z } from "zod";
-
-// Validation schema for updating a seller lead
-const updateSellerLeadSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
-  email: z.string().email().optional().or(z.literal("")).nullable(),
-  status: z.enum(["new", "proposal_sent", "proposal_accepted", "dropped"]).optional(),
-  source: z.enum(["website", "99acres", "magicbricks", "housing", "nobroker", "mygate", "referral"]).optional(),
-  sourceUrl: z.string().url().optional().or(z.literal("")).nullable(),
-  referredById: z.string().uuid().optional().nullable(),
-  buildingId: z.string().uuid().optional().nullable(),
-  unitId: z.string().uuid().optional().nullable(),
-  assignedToId: z.string().uuid().optional().nullable(),
-  followUpDate: z.string().datetime().optional().nullable().or(z.literal("")),
-  isNri: z.boolean().optional(),
-  notes: z.string().optional().nullable(),
-});
+import { updateSellerLeadSchema } from "@/lib/validations/seller";
 
 /**
  * GET /api/v1/seller-leads/[id]
@@ -52,11 +35,16 @@ export async function GET(
         sql`${sellerLeads.deletedAt} IS NULL`
       ),
       with: {
+        profile: true,
         building: true,
         unit: true,
         assignedTo: true,
         referredBy: true,
         createdBy: true,
+        notes: {
+          where: isNull(notes.deletedAt),
+          orderBy: [desc(notes.createdAt)],
+        },
         communications: {
           limit: 10,
           orderBy: (comm, { desc }) => [desc(comm.createdAt)],
@@ -130,12 +118,16 @@ export async function PUT(
       updatedAt: new Date(),
     };
 
+    if (validatedData.profileId !== undefined) updateData.profileId = validatedData.profileId;
     if (validatedData.name !== undefined) updateData.name = validatedData.name;
     if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
     if (validatedData.email !== undefined) updateData.email = validatedData.email || null;
+    if (validatedData.secondaryPhone !== undefined) updateData.secondaryPhone = validatedData.secondaryPhone;
     if (validatedData.status !== undefined) updateData.status = validatedData.status;
     if (validatedData.source !== undefined) updateData.source = validatedData.source;
     if (validatedData.sourceUrl !== undefined) updateData.sourceUrl = validatedData.sourceUrl || null;
+    if (validatedData.sourceListingUrl !== undefined) updateData.sourceListingUrl = validatedData.sourceListingUrl || null;
+    if (validatedData.dropReason !== undefined) updateData.dropReason = validatedData.dropReason;
     if (validatedData.referredById !== undefined) updateData.referredById = validatedData.referredById;
     if (validatedData.buildingId !== undefined) updateData.buildingId = validatedData.buildingId;
     if (validatedData.unitId !== undefined) updateData.unitId = validatedData.unitId;
@@ -144,7 +136,6 @@ export async function PUT(
       updateData.followUpDate = validatedData.followUpDate ? new Date(validatedData.followUpDate) : null;
     }
     if (validatedData.isNri !== undefined) updateData.isNri = validatedData.isNri;
-    if (validatedData.notes !== undefined) updateData.notes = validatedData.notes;
 
     const [updatedLead] = await db
       .update(sellerLeads)
@@ -171,9 +162,9 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating seller lead:", error);
 
-    if (error instanceof z.ZodError) {
+    if (error instanceof Error && error.name === "ZodError") {
       return NextResponse.json(
-        { error: "Validation Error", message: "Invalid request body", details: error.errors },
+        { error: "Validation Error", message: "Invalid request body", details: (error as unknown as { errors: unknown[] }).errors },
         { status: 400 }
       );
     }

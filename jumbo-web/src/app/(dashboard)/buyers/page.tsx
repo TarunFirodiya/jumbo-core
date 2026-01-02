@@ -1,9 +1,10 @@
 import { BuyersPageContent } from "@/components/buyers/buyers-page-content";
-import { db } from "@/lib/db";
-import { leads, profiles } from "@/lib/db/schema";
-import { count, desc, eq, and, or, ilike, inArray, ne, gt } from "drizzle-orm";
+import * as leadService from "@/services/lead.service";
 import type { LeadWithRelations } from "@/types";
 import { startOfMonth } from "date-fns";
+import { db } from "@/lib/db";
+import { leads } from "@/lib/db/schema";
+import { count, ne, gt, sql, and } from "drizzle-orm";
 
 export default async function BuyersPage({
   searchParams,
@@ -13,93 +14,38 @@ export default async function BuyersPage({
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const limit = Number(params.limit) || 10;
-  const offset = (page - 1) * limit;
-
   const status = params.status as string | undefined;
   const agentId = params.agentId as string | undefined;
-  const search = params.search as string | undefined;
 
-  // Start independent queries immediately
-  const activePromise = db.select({ count: count() })
+  // Fetch data and stats in parallel
+  const [leadsResult, activeResult, newResult] = await Promise.all([
+    leadService.getLeads({
+      page,
+      limit,
+      status: status && status !== "all" ? status : undefined,
+      agentId: agentId && agentId !== "all" ? agentId : undefined,
+    }),
+    // Get active buyers count
+    db.select({ count: count() })
       .from(leads)
-      .where(ne(leads.status, "closed"));
-      
-  const newPromise = db.select({ count: count() })
+      .where(and(sql`${leads.deletedAt} IS NULL`, ne(leads.status, "closed"))),
+    // Get new this month count
+    db.select({ count: count() })
       .from(leads)
-      .where(gt(leads.createdAt, startOfMonth(new Date())));
-
-  const filters = [];
-  
-  if (status && status !== "all") {
-    filters.push(eq(leads.status, status));
-  }
-
-  if (agentId && agentId !== "all") {
-    filters.push(eq(leads.assignedAgentId, agentId));
-  }
-
-  if (search) {
-    const matchingProfiles = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(
-        or(
-          ilike(profiles.fullName, `%${search}%`),
-          ilike(profiles.email, `%${search}%`),
-          ilike(profiles.phone, `%${search}%`)
-        )
-      );
-    
-    const profileIds = matchingProfiles.map((p) => p.id);
-    
-    if (profileIds.length > 0) {
-      filters.push(inArray(leads.profileId, profileIds));
-    } else {
-      // No matching profiles found, ensure no results are returned
-      filters.push(eq(leads.id, "00000000-0000-0000-0000-000000000000"));
-    }
-  }
-
-  const whereClause = filters.length > 0 ? and(...filters) : undefined;
-
-  // Run queries sequentially to save connections
-  const data = await db.query.leads.findMany({
-    with: {
-      profile: true,
-      assignedAgent: true,
-    },
-    where: whereClause,
-    limit: limit,
-    offset: offset,
-    orderBy: [desc(leads.createdAt)],
-  });
-
-  const totalResult = await db.select({ count: count() })
-    .from(leads)
-    .where(whereClause);
-
-  const activeResult = await db.select({ count: count() })
-      .from(leads)
-      .where(ne(leads.status, "closed"));
-      
-  const newResult = await db.select({ count: count() })
-      .from(leads)
-      .where(gt(leads.createdAt, startOfMonth(new Date())));
-      
-  const total = totalResult[0].count;
-
-  const pagination = {
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-  };
+      .where(and(sql`${leads.deletedAt} IS NULL`, gt(leads.createdAt, startOfMonth(new Date())))),
+  ]);
 
   const stats = {
-    totalBuyers: total,
+    totalBuyers: leadsResult.pagination.total,
     activeBuyers: activeResult[0].count,
     newThisMonth: newResult[0].count,
   };
 
-  return <BuyersPageContent data={data as LeadWithRelations[]} pagination={pagination} stats={stats} />;
+  return (
+    <BuyersPageContent
+      data={leadsResult.data as LeadWithRelations[]}
+      pagination={leadsResult.pagination}
+      stats={stats}
+    />
+  );
 }

@@ -3,6 +3,29 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { leads } from "@/lib/db/schema";
 import { indianPhoneSchema } from "./common";
 
+// Lead source options (same as seller leads + manual entry options)
+export const leadSourceOptions = [
+  { value: "website", label: "Website" },
+  { value: "99acres", label: "99Acres" },
+  { value: "magicbricks", label: "Magicbricks" },
+  { value: "housing", label: "Housing.com" },
+  { value: "nobroker", label: "NoBroker" },
+  { value: "mygate", label: "MyGate" },
+  { value: "referral", label: "Referral" },
+  { value: "manual_entry", label: "Manual Entry" },
+  { value: "walk_in", label: "Walk-in" },
+  { value: "phone_inquiry", label: "Phone Inquiry" },
+] as const;
+
+// Lead status options
+export const leadStatusOptions = [
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "active_visitor", label: "Active Visitor" },
+  { value: "at_risk", label: "At Risk" },
+  { value: "closed", label: "Closed" },
+] as const;
+
 // Base schemas from Drizzle
 export const insertLeadSchema = createInsertSchema(leads, {
   source: z.string().min(1, "Source is required"),
@@ -26,19 +49,53 @@ export const createLeadRequestSchema = z.object({
     email: z.string().email().optional().nullable(),
   }),
   // Lead specific info
+  profileId: z.string().uuid().optional().nullable(),
+  leadId: z.string().optional(),
   source: z.string().min(1, "Source is required"),
+  status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]).default("new"),
   externalId: z.string().optional(),
+  secondaryPhone: indianPhoneSchema.optional().nullable(),
+  sourceListingId: z.string().optional().nullable(),
+  dropReason: z.string().optional().nullable(),
+  locality: z.string().optional(),
+  zone: z.string().optional(),
+  pipeline: z.boolean().default(false),
+  referredBy: z.string().optional(),
+  testListingId: z.string().optional(),
   requirements: z.object({
     bhk: z.array(z.number().int().min(1).max(10)).optional(),
     budget_min: z.number().positive().optional(),
     budget_max: z.number().positive().optional(),
     localities: z.array(z.string()).optional(),
   }).optional(),
+  preferences: z.object({
+    configuration: z.array(z.string()).optional(),
+    max_cap: z.string().optional(),
+    landmark: z.string().optional(),
+    property_type: z.string().optional(),
+    floor_preference: z.string().optional(),
+    khata: z.string().optional(),
+    main_door_facing: z.string().optional(),
+    must_haves: z.array(z.string()).optional(),
+    buy_reason: z.string().optional(),
+    preferred_buildings: z.array(z.string().uuid()).optional(),
+  }).optional(),
+  assignedAgentId: z.string().uuid().optional().nullable(),
+});
+
+// Form schema for creating leads from UI (flattened structure)
+export const createLeadFormSchema = z.object({
+  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  phone: indianPhoneSchema,
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  secondaryPhone: indianPhoneSchema.optional().or(z.literal("")),
+  source: z.enum(["website", "99acres", "magicbricks", "housing", "nobroker", "mygate", "referral", "manual_entry", "walk_in", "phone_inquiry"]),
+  status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]).default("new"),
+  assignedAgentId: z.string().uuid().optional().nullable(),
 });
 
 export const updateLeadStatusSchema = z.object({
   status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]),
-  notes: z.string().optional(),
 });
 
 export const assignLeadSchema = z.object({
@@ -71,6 +128,7 @@ export const leadQuerySchema = z.object({
 
 // Type exports
 export type CreateLeadRequest = z.infer<typeof createLeadRequestSchema>;
+export type CreateLeadFormData = z.infer<typeof createLeadFormSchema>;
 export type UpdateLeadStatus = z.infer<typeof updateLeadStatusSchema>;
 export type AssignLead = z.infer<typeof assignLeadSchema>;
 export type HousingWebhook = z.infer<typeof housingWebhookSchema>;

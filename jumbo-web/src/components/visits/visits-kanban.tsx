@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import type { VisitFormatted } from "@/app/(dashboard)/visits/page";
+import { toast } from "sonner";
 
 interface KanbanVisit extends KanbanItemProps {
   original: VisitFormatted;
@@ -86,6 +87,44 @@ export function VisitsKanban({ data }: VisitsKanbanProps) {
   useEffect(() => {
     setTasks(initialData);
   }, [initialData]);
+
+  // Handle drag and drop status updates
+  const handleDataChange = async (newData: KanbanVisit[]) => {
+    setTasks(newData);
+    
+    // Find visits that changed status
+    const statusUpdates = newData
+      .filter((item) => {
+        const original = data.find((v) => v.id === item.id);
+        return original && original.status !== item.column;
+      })
+      .map((item) => ({
+        id: item.id,
+        status: item.column.toLowerCase(), // Convert to lowercase for API
+      }));
+
+    // Update each changed visit
+    for (const update of statusUpdates) {
+      try {
+        const response = await fetch(`/api/v1/visits/${update.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: update.status }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Failed to update visit status");
+        }
+      } catch (error) {
+        console.error("Error updating visit status:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to update visit status");
+        // Revert to original data
+        setTasks(initialData);
+        break; // Stop processing other updates if one fails
+      }
+    }
+  };
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -141,7 +180,7 @@ export function VisitsKanban({ data }: VisitsKanbanProps) {
         <KanbanProvider
           columns={COLUMNS}
           data={tasks}
-          onDataChange={(newData) => setTasks(newData)}
+          onDataChange={handleDataChange}
           className="h-[calc(100vh-280px)] min-h-[500px]"
         >
           {(column) => (

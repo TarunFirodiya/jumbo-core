@@ -53,7 +53,7 @@ type TableListing = {
 function transformListing(listing: ListingWithRelations): TableListing {
   const unit = listing.unit;
   const building = unit?.building;
-  const agent = listing.listingAgent;
+  const agent = (listing as typeof listing & { listingAgent?: { fullName: string | null } | null }).listingAgent;
   
   const agentName = agent?.fullName || "Unassigned";
   const agentInitials = agent?.fullName
