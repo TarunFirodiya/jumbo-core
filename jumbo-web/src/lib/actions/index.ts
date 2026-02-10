@@ -768,7 +768,7 @@ export async function updateVisit(
       entityType: "visit",
       entityId: id,
       action: "update",
-      changes: computeChanges(currentVisit, validatedData),
+      changes: computeChanges(currentVisit as Record<string, unknown>, validatedData as Record<string, unknown>),
     });
 
     revalidatePath(`/visits/${id}`);
@@ -855,7 +855,7 @@ export async function updateSeller(
       entityType: "profile",
       entityId: id,
       action: "update",
-      changes: computeChanges(profile, data),
+      changes: computeChanges(profile as Record<string, unknown>, data as Record<string, unknown>),
     });
 
     revalidatePath(`/sellers/${id}`);

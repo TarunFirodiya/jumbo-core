@@ -40,7 +40,7 @@ export async function createVisit(data: NewVisit): Promise<Visit> {
  * Get visit by ID
  */
 export async function getVisitById(id: string): Promise<Visit | null> {
-  return db.query.visits.findFirst({
+  const result = await db.query.visits.findFirst({
     where: eq(visits.id, id),
     with: {
       tour: {
@@ -52,6 +52,7 @@ export async function getVisitById(id: string): Promise<Visit | null> {
       lead: {
         with: {
           profile: true,
+          assignedAgent: true,
         },
       },
       listing: {
@@ -65,6 +66,7 @@ export async function getVisitById(id: string): Promise<Visit | null> {
       },
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -79,7 +81,7 @@ export async function getVisits(
   const conditions = [];
 
   if (status) {
-    conditions.push(eq(visits.status, status));
+    conditions.push(eq(visits.status, status as any));
   }
 
   if (leadId) {
@@ -302,7 +304,7 @@ export async function cancelVisit(visitId: string, dropReason?: string): Promise
     .set({
       visitCanceled: true,
       canceledAt: new Date(),
-      dropReason: dropReason ?? null,
+      dropReason: (dropReason ?? null) as any,
     })
     .where(eq(visits.id, visitId))
     .returning();
@@ -391,7 +393,7 @@ export async function completeVisit(
       feedbackText: data.feedback?.text ?? null,
       feedbackRating: data.feedback?.rating ?? null,
       buyerScore: data.feedback?.buyerScore?.toString() ?? null,
-      primaryPainPoint: data.feedback?.primaryPainPoint ?? null,
+      primaryPainPoint: (data.feedback?.primaryPainPoint ?? null) as any,
       status: "completed",
     })
     .where(eq(visits.id, visitId))

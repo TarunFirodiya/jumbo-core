@@ -20,13 +20,14 @@ export async function createUnit(data: NewUnit): Promise<Unit> {
  * Get unit by ID
  */
 export async function getUnitById(id: string): Promise<Unit | null> {
-  return db.query.units.findFirst({
+  const result = await db.query.units.findFirst({
     where: and(eq(units.id, id), isNull(units.deletedAt)),
     with: {
       building: true,
       owner: true,
     },
   });
+  return result ?? null;
 }
 
 /**

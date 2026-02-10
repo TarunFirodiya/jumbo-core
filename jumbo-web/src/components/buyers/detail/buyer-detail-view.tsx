@@ -15,7 +15,8 @@ import {
   Paperclip,
   ChevronRight,
   MessageSquare,
-  Save
+  Save,
+  Loader2
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +45,7 @@ import { Rating } from "@/components/kibo-ui/rating";
 // import { Status } from "@/components/kibo-ui/status"; // Using standard Badge/Select for business status for now as kibo status is specific to system status
 
 import { updateBuyer } from "@/lib/actions";
+import type { AuditLogWithRelations } from "@/types";
 import { toast } from "sonner";
 
 export interface BuyerDetail {
@@ -110,6 +112,8 @@ type BuyerFormValues = z.infer<typeof buyerFormSchema>;
 
 export function BuyerDetailView({ buyer, id }: BuyerDetailViewProps) {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [auditLogs, setAuditLogs] = React.useState<AuditLogWithRelations[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = React.useState(true);
 
   const form = useForm<BuyerFormValues>({
     resolver: zodResolver(buyerFormSchema),
@@ -127,6 +131,26 @@ export function BuyerDetailView({ buyer, id }: BuyerDetailViewProps) {
       rating: 0,
     },
   });
+
+  // Fetch audit logs for activity tab
+  React.useEffect(() => {
+    async function fetchAuditLogs() {
+      if (!id) return;
+      setIsLoadingLogs(true);
+      try {
+        const response = await fetch(`/api/v1/audit-logs?entityType=lead&entityId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAuditLogs(data.data || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch audit logs:", error);
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    }
+    fetchAuditLogs();
+  }, [id]);
 
   async function onSubmit(data: BuyerFormValues) {
     setIsSaving(true);
@@ -444,26 +468,37 @@ export function BuyerDetailView({ buyer, id }: BuyerDetailViewProps) {
                        <Card>
                           <CardContent className="p-6">
                             <h3 className="text-lg font-bold mb-6">Recent Activity</h3>
-                             <div className="relative border-l border-muted ml-4 pl-8 space-y-8 pb-4">
-                                {buyer.activityLog.map((activity, index) => (
-                                   <div key={index} className="relative">
-                                      <div className={cn("absolute -left-8 -translate-x-1/2 top-1 bg-background rounded-full border p-1.5 z-10 shadow-sm text-primary")}>
-                                         <Eye className="size-4" />
+                            {isLoadingLogs ? (
+                              <div className="flex items-center justify-center py-6 text-muted-foreground">
+                                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                Loading activity...
+                              </div>
+                            ) : auditLogs.length === 0 ? (
+                              <div className="text-sm text-muted-foreground">No activity recorded yet.</div>
+                            ) : (
+                              <div className="relative border-l border-muted ml-4 pl-8 space-y-8 pb-4">
+                                {auditLogs.map((log) => (
+                                  <div key={log.id} className="relative">
+                                    <div className={cn("absolute -left-8 -translate-x-1/2 top-1 bg-background rounded-full border p-1.5 z-10 shadow-sm text-primary")}>
+                                      <Eye className="size-4" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-bold text-foreground capitalize">{log.action}</h4>
+                                        <span className="text-xs text-muted-foreground">
+                                          {log.createdAt ? new Date(log.createdAt).toLocaleString() : ""}
+                                        </span>
                                       </div>
-                                      <div className="flex flex-col gap-1">
-                                         <div className="flex items-center justify-between">
-                                            <h4 className="text-sm font-bold text-foreground">{activity.title}</h4>
-                                            <span className="text-xs text-muted-foreground">{activity.date}</span>
-                                         </div>
-                                         {activity.description && (
-                                            <p className="text-sm text-muted-foreground mt-1 bg-muted/30 p-3 rounded-md border">
-                                               {activity.description}
-                                            </p>
-                                         )}
-                                      </div>
-                                   </div>
+                                      {log.changes && (
+                                        <p className="text-sm text-muted-foreground mt-1 bg-muted/30 p-3 rounded-md border">
+                                          {JSON.stringify(log.changes)}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
                                 ))}
-                             </div>
+                              </div>
+                            )}
                           </CardContent>
                        </Card>
                     </TabsContent>

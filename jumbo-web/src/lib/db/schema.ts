@@ -194,6 +194,27 @@ export const offerStatusEnum = pgEnum("offer_status", [
   "countered",
 ]);
 
+export const contactTypeEnum = pgEnum("contact_type", [
+  "customer",
+  "partner",
+  "internal",
+]);
+
+// ============================================
+// 0. UNIVERSAL CONTACTS (Identity Layer)
+// ============================================
+
+export const contacts = pgTable("contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  phone: text("phone").unique().notNull(), // The primary identifier
+  name: text("name"),
+  email: text("email"),
+  type: contactTypeEnum("type").default("customer"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
 // ============================================
 // 1. USER & AGENT MANAGEMENT
 // ============================================
@@ -207,7 +228,8 @@ export const profiles = pgTable("profiles", {
   role: userRoleEnum("role").default("buyer_agent"),
   territoryId: text("territory_id"),
   totalCoins: integer("total_coins").default(0),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  contactId: uuid("contact_id").references((): any => contacts.id),
+  createdById: uuid("created_by_id").references((): any => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
@@ -349,6 +371,7 @@ export const leads = pgTable("leads", {
   externalId: text("external_id"), // ID from Housing.com, MagicBricks, etc.
   secondaryPhone: text("secondary_phone"),
   sourceListingId: text("source_listing_id"),
+  contactId: uuid("contact_id").references(() => contacts.id), // Migration: Link to Identity
   dropReason: text("drop_reason"),
   locality: text("locality"),
   zone: text("zone"),
@@ -395,6 +418,7 @@ export const sellerLeads = pgTable("seller_leads", {
   source: sellerLeadSourceEnum("source").notNull(),
   sourceUrl: text("source_url"),
   sourceListingUrl: text("source_listing_url"),
+  contactId: uuid("contact_id").references(() => contacts.id), // Migration: Link to Identity
   dropReason: dropReasonEnum("drop_reason"),
   referredById: uuid("referred_by_id").references(() => profiles.id),
   buildingId: uuid("building_id").references(() => buildings.id),
@@ -475,7 +499,7 @@ export const visits = pgTable("visits", {
   buyerScore: numeric("buyer_score"),
   rescheduleTime: timestamp("reschedule_time", { withTimezone: true }),
   rescheduleRequested: boolean("reschedule_requested").default(false),
-  rescheduledFromVisitId: uuid("rescheduled_from_visit_id").references(() => visits.id),
+  rescheduledFromVisitId: uuid("rescheduled_from_visit_id").references((): any => visits.id),
   assignedVaId: uuid("assigned_va_id").references(() => profiles.id),
   completedById: uuid("completed_by_id").references(() => profiles.id),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
@@ -698,6 +722,10 @@ export const profilesRelations = relations(profiles, ({ many, one }) => ({
   offboardingDelistings: many(listings, { relationName: "offboardingDelistedBy" }),
   assignedVisits: many(visits, { relationName: "assignedVa" }),
   completedVisits: many(visits, { relationName: "completedBy" }),
+  contact: one(contacts, {
+    fields: [profiles.contactId],
+    references: [contacts.id],
+  }),
   createdBy: one(profiles, {
     fields: [profiles.createdById],
     references: [profiles.id],
@@ -784,6 +812,10 @@ export const leadsRelations = relations(leads, ({ one, many }) => ({
   // Query notes separately using entityType='buyer_lead' and entityId=lead.id
   buyerEvents: many(buyerEvents),
   offers: many(offers),
+  contact: one(contacts, {
+    fields: [leads.contactId],
+    references: [contacts.id],
+  }),
 }));
 
 export const communicationsRelations = relations(communications, ({ one }) => ({
@@ -917,6 +949,10 @@ export const sellerLeadsRelations = relations(sellerLeads, ({ one, many }) => ({
   tasks: many(tasks),
   // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
   // Query notes separately using entityType='seller_lead' and entityId=sellerLead.id
+  contact: one(contacts, {
+    fields: [sellerLeads.contactId],
+    references: [contacts.id],
+  }),
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
@@ -924,6 +960,12 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
     fields: [auditLogs.performedById],
     references: [profiles.id],
   }),
+}));
+
+export const contactsRelations = relations(contacts, ({ many }) => ({
+  profiles: many(profiles),
+  leads: many(leads),
+  sellerLeads: many(sellerLeads),
 }));
 
 // ============================================
@@ -1076,6 +1118,9 @@ export type NewBuyerEvent = typeof buyerEvents.$inferInsert;
 
 export type Offer = typeof offers.$inferSelect;
 export type NewOffer = typeof offers.$inferInsert;
+
+export type Contact = typeof contacts.$inferSelect;
+export type NewContact = typeof contacts.$inferInsert;
 
 // Enum type exports
 export type DropReason = (typeof dropReasonEnum.enumValues)[number];

@@ -21,7 +21,7 @@ export async function createTour(data: NewVisitTour): Promise<VisitTour> {
  * Get tour by ID
  */
 export async function getTourById(id: string): Promise<VisitTour | null> {
-  return db.query.visitTours.findFirst({
+  const result = await db.query.visitTours.findFirst({
     where: and(eq(visitTours.id, id), isNull(visitTours.deletedAt)),
     with: {
       dispatchAgent: true,
@@ -29,6 +29,7 @@ export async function getTourById(id: string): Promise<VisitTour | null> {
       visits: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -43,7 +44,7 @@ export async function getTours(
   const conditions = [isNull(visitTours.deletedAt)];
 
   if (status) {
-    conditions.push(eq(visitTours.status, status));
+    conditions.push(eq(visitTours.status, status as any));
   }
 
   if (fieldAgentId) {

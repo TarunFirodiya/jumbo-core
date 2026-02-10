@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { visits, notes } from "@/lib/db/schema";
+import { visits } from "@/lib/db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { logActivity, computeChanges } from "@/lib/audit";
@@ -45,14 +45,7 @@ export async function GET(
         assignedVa: true,
         completedBy: true,
         rescheduledFrom: true,
-        notes: {
-          where: sql`${notes.deletedAt} IS NULL`,
-          orderBy: [desc(notes.createdAt)],
-          with: {
-            createdBy: true,
-          },
-        },
-          communications: {
+        communications: {
             limit: 10,
             orderBy: (comm: any, { desc }: any) => [desc(comm.createdAt)],
           },
@@ -333,7 +326,7 @@ export async function POST(
             status: "completed",
             feedback: validatedData.feedback,
             feedbackRating: validatedData.feedbackRating,
-            buyerScore: validatedData.buyerScore,
+            buyerScore: validatedData.buyerScore?.toString(),
             primaryPainPoint: validatedData.primaryPainPoint,
             completedById: user.id,
           })

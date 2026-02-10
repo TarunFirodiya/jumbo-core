@@ -21,7 +21,7 @@ export async function createSellerLead(data: NewSellerLead): Promise<SellerLead>
  * Get seller lead by ID
  */
 export async function getSellerLeadById(id: string): Promise<SellerLead | null> {
-  return db.query.sellerLeads.findFirst({
+  const result = await db.query.sellerLeads.findFirst({
     where: and(eq(sellerLeads.id, id), isNull(sellerLeads.deletedAt)),
     with: {
       assignedTo: true,
@@ -31,6 +31,7 @@ export async function getSellerLeadById(id: string): Promise<SellerLead | null> 
       createdBy: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -49,11 +50,11 @@ export async function getSellerLeads(
   }
 
   if (status) {
-    conditions.push(eq(sellerLeads.status, status));
+    conditions.push(eq(sellerLeads.status, status as any));
   }
 
   if (source) {
-    conditions.push(eq(sellerLeads.source, source));
+    conditions.push(eq(sellerLeads.source, source as any));
   }
 
   if (assignedToId) {

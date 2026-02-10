@@ -30,27 +30,29 @@ export default async function VisitsPage() {
   const visitsResult = await visitService.getVisits({ limit: 100 });
 
   // Format visits to match the expected structure
-  const formattedVisits: VisitFormatted[] = visitsResult.data.map((v) => {
+  // Cast to any to work around Drizzle's union type inference for nested relations
+  const formattedVisits: VisitFormatted[] = visitsResult.data.map((visit) => {
+    const v = visit as any;
     const buildingName = v.listing?.unit?.building?.name || "Unknown Building";
     const locality = v.listing?.unit?.building?.locality || "";
     const city = v.listing?.unit?.building?.city || "";
     const address = [locality, city].filter(Boolean).join(", ");
-    
+
     const propertyImage = Array.isArray(v.listing?.images) && v.listing.images.length > 0
       ? v.listing.images[0]
       : "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&auto=format&fit=crop&q=60";
-    
+
     return {
-      id: v.id,
+      id: visit.id,
       property: {
         name: buildingName,
         address: address,
         image: propertyImage,
       },
       dateTime: {
-        date: v.scheduledAt ? new Date(v.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
-        time: v.scheduledAt ? new Date(v.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "",
-        iso: v.scheduledAt,
+        date: visit.scheduledAt ? new Date(visit.scheduledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
+        time: visit.scheduledAt ? new Date(visit.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "",
+        iso: visit.scheduledAt,
       },
       agent: {
         name: v.lead?.assignedAgent?.fullName || v.assignedVa?.fullName || "Unassigned",
@@ -60,7 +62,7 @@ export default async function VisitsPage() {
         name: v.lead?.profile?.fullName || "Unknown Client",
         type: v.lead?.status || "New Lead",
       },
-      status: v.status ? v.status.charAt(0).toUpperCase() + v.status.slice(1) : "Pending",
+      status: visit.status ? visit.status.charAt(0).toUpperCase() + visit.status.slice(1) : "Pending",
     };
   });
 

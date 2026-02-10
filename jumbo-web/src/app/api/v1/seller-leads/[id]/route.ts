@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { sellerLeads, notes } from "@/lib/db/schema";
-import { eq, and, sql, desc, isNull } from "drizzle-orm";
+import { sellerLeads } from "@/lib/db/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { logActivity, computeChanges } from "@/lib/audit";
 import { updateSellerLeadSchema } from "@/lib/validations/seller";
@@ -41,10 +41,6 @@ export async function GET(
         assignedTo: true,
         referredBy: true,
         createdBy: true,
-        notes: {
-          where: isNull(notes.deletedAt),
-          orderBy: [desc(notes.createdAt)],
-        },
         communications: {
           limit: 10,
           orderBy: (comm, { desc }) => [desc(comm.createdAt)],

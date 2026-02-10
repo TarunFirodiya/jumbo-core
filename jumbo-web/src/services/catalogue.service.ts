@@ -28,7 +28,7 @@ export async function createCatalogue(data: NewHomeCatalogue): Promise<HomeCatal
  * Get catalogue by ID
  */
 export async function getCatalogueById(id: string): Promise<HomeCatalogue | null> {
-  return db.query.homeCatalogues.findFirst({
+  const result = await db.query.homeCatalogues.findFirst({
     where: eq(homeCatalogues.id, id),
     with: {
       listing: {
@@ -44,6 +44,7 @@ export async function getCatalogueById(id: string): Promise<HomeCatalogue | null
       inspection: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -51,10 +52,7 @@ export async function getCatalogueById(id: string): Promise<HomeCatalogue | null
  */
 export async function getCataloguesByListing(listingId: string): Promise<HomeCatalogue[]> {
   return db.query.homeCatalogues.findMany({
-    where: and(
-      eq(homeCatalogues.listingId, listingId),
-      isNull(homeCatalogues.deletedAt)
-    ),
+    where: eq(homeCatalogues.listingId, listingId),
     with: {
       cataloguedBy: true,
       inspection: true,
@@ -79,7 +77,7 @@ export async function getCatalogues(
   }
 
   if (status) {
-    conditions.push(eq(homeCatalogues.status, status));
+    conditions.push(eq(homeCatalogues.status, status as any));
   }
 
   if (cataloguedById) {

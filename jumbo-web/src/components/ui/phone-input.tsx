@@ -127,7 +127,7 @@ const CountrySelect = ({
                       onSelect={() => handleSelect(option.value!)}
                     >
                       <FlagComponent
-                        country={option.value}
+                        country={option.value!}
                         countryName={option.label}
                       />
                       <span className="flex-1 text-sm">{option.label}</span>

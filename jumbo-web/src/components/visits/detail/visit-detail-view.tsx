@@ -44,6 +44,7 @@ import {
 import { DetailLayout } from "@/components/shared/detail-layout";
 import { Rating } from "@/components/kibo-ui/rating";
 import { updateVisit } from "@/lib/actions";
+import type { VisitStatus } from "@/types";
 
 export interface VisitDetail {
   id: string;
@@ -75,10 +76,10 @@ interface VisitDetailViewProps {
 }
 
 const visitFormSchema = z.object({
-  status: z.string(),
-  feedback: z.string().optional(),
+  status: z.enum(["pending", "scheduled", "in_progress", "completed", "cancelled", "no_show"]),
+  feedbackText: z.string().optional(),
   notes: z.string().optional(),
-  rating: z.number().optional().default(0),
+  feedbackRating: z.number().optional().default(0),
 });
 
 type VisitFormValues = z.infer<typeof visitFormSchema>;
@@ -89,10 +90,11 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
   const form = useForm<VisitFormValues>({
     resolver: zodResolver(visitFormSchema) as any,
     defaultValues: {
-      status: visit?.status || "Pending",
-      feedback: visit?.feedback || "",
+      status:
+        (visit?.status?.toLowerCase?.() as VisitStatus | undefined) || "pending",
+      feedbackText: visit?.feedback || "",
       notes: visit?.notes || "",
-      rating: 0,
+      feedbackRating: 0,
     },
   });
 
@@ -100,8 +102,9 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
     setIsSaving(true);
     try {
       const result = await updateVisit(id, {
-        ...data,
-        status: data.status as "pending" | "in_progress" | "completed" | "scheduled" | "cancelled" | "no_show",
+        status: data.status,
+        feedbackText: data.feedbackText,
+        feedbackRating: data.feedbackRating,
       });
       if (result.success) {
         toast.success(result.message);
@@ -155,15 +158,16 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
                     render={({ field }) => (
                       <FormItem>
                          <FormControl>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <SelectTrigger className="h-9">
                                 <SelectValue placeholder="Status" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Scheduled">Scheduled</SelectItem>
-                                <SelectItem value="Pending">Pending</SelectItem>
-                                <SelectItem value="Completed">Completed</SelectItem>
-                                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                                <SelectItem value="scheduled">Scheduled</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                <SelectItem value="no_show">No Show</SelectItem>
                               </SelectContent>
                             </Select>
                          </FormControl>
@@ -285,7 +289,7 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
                           <CardContent className="space-y-6">
                               <FormField
                                 control={form.control}
-                                name="rating"
+                                name="feedbackRating"
                                 render={({ field }) => (
                                    <FormItem>
                                       <FormLabel>Client Rating</FormLabel>
@@ -308,7 +312,7 @@ export function VisitDetailView({ visit, id }: VisitDetailViewProps) {
                              
                              <FormField
                                 control={form.control}
-                                name="feedback"
+                                name="feedbackText"
                                 render={({ field }) => (
                                    <FormItem>
                                       <FormLabel>Feedback Notes</FormLabel>

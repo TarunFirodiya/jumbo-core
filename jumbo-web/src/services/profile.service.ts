@@ -20,27 +20,30 @@ export async function createProfile(data: NewProfile): Promise<Profile> {
  * Get profile by ID
  */
 export async function getProfileById(id: string): Promise<Profile | null> {
-  return db.query.profiles.findFirst({
+  const result = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, id), isNull(profiles.deletedAt)),
   });
+  return result ?? null;
 }
 
 /**
  * Get profile by phone number
  */
 export async function getProfileByPhone(phone: string): Promise<Profile | null> {
-  return db.query.profiles.findFirst({
+  const result = await db.query.profiles.findFirst({
     where: and(eq(profiles.phone, phone), isNull(profiles.deletedAt)),
   });
+  return result ?? null;
 }
 
 /**
  * Get profile by email
  */
 export async function getProfileByEmail(email: string): Promise<Profile | null> {
-  return db.query.profiles.findFirst({
+  const result = await db.query.profiles.findFirst({
     where: and(eq(profiles.email, email), isNull(profiles.deletedAt)),
   });
+  return result ?? null;
 }
 
 /**

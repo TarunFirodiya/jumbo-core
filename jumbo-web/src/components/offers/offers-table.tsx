@@ -62,7 +62,7 @@ function transformOffer(offer: Offer & {
   };
 }
 
-export const columns: ColumnDef<Offer>[] = [
+export const columns: ColumnDef<TableOffer>[] = [
   {
     accessorKey: "property",
     header: "Property",

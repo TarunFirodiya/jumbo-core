@@ -28,6 +28,7 @@ interface BuyersTableProps {
 
 export const columns: ColumnDef<LeadWithRelations>[] = [
   {
+    id: "profile.fullName",
     accessorKey: "profile.fullName",
     header: "Buyer Name",
     cell: ({ row }) => (
@@ -114,5 +115,5 @@ export const columns: ColumnDef<LeadWithRelations>[] = [
 ];
 
 export function BuyersTable({ data }: BuyersTableProps) {
-  return <DataTable columns={columns} data={data} filterColumn="profile_fullName" />;
+  return <DataTable columns={columns} data={data} filterColumn="profile.fullName" />;
 }

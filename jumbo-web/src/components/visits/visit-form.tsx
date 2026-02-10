@@ -42,11 +42,11 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
-// Form Schema
+// Form Schema aligned to API contract (/api/v1/visits expects leadId + scheduledAt)
 const formSchema = z.object({
-  buyerId: z.string().min(1, "Please select a buyer."),
+  leadId: z.string().min(1, "Please select a buyer."),
   listingId: z.string().min(1, "Please select a listing."),
-  date: z.date(),
+  scheduledAt: z.date(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -95,36 +95,67 @@ export function VisitForm({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      buyerId: defaultBuyerId || "",
+      leadId: defaultBuyerId || "",
       listingId: defaultListingId || "",
     },
   });
 
-  // Fetch options when modal opens
+  // Fetch options when modal opens (reuse existing leads/listings endpoints)
   React.useEffect(() => {
-    if (open) {
-      const fetchOptions = async () => {
-        try {
-          setIsLoading(true);
-          const response = await fetch("/api/v1/visits/options");
-          const data = await response.json();
-          if (data.data) {
-            setBuyers(data.data.buyers || []);
-            setListings(data.data.listings || []);
-          }
-        } catch (error) {
-          toast.error("Failed to load options");
-        } finally {
-          setIsLoading(false);
+    if (!open) return;
+
+    const fetchOptions = async () => {
+      try {
+        setIsLoading(true);
+        const [leadsRes, listingsRes] = await Promise.all([
+          fetch("/api/v1/leads?limit=50"),
+          fetch("/api/v1/listings?limit=50"),
+        ]);
+
+        if (leadsRes.ok) {
+          const leadsJson = await leadsRes.json();
+          const leadsData = leadsJson.data || [];
+          setBuyers(
+            leadsData.map((lead: any) => ({
+              id: lead.id,
+              name: lead.profile?.fullName ?? "Unknown",
+              phone: lead.profile?.phone ?? "",
+              status: lead.status ?? "new",
+            }))
+          );
+        } else {
+          toast.error("Failed to load buyers");
         }
-      };
-      fetchOptions();
-    }
+
+        if (listingsRes.ok) {
+          const listingsJson = await listingsRes.json();
+          const listingsData = listingsJson.data || [];
+          setListings(
+            listingsData.map((listing: any) => ({
+              id: listing.id,
+              price: listing.askingPrice ?? listing.price ?? null,
+              bhk: listing.bhk ?? null,
+              size: listing.size ?? listing.area ?? null,
+              buildingName: listing.building?.name ?? listing.name ?? "Listing",
+              locality: listing.building?.locality ?? "",
+            }))
+          );
+        } else {
+          toast.error("Failed to load listings");
+        }
+      } catch (error) {
+        toast.error("Failed to load options");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchOptions();
   }, [open]);
 
   // Update form defaults if props change
   React.useEffect(() => {
-    if (defaultBuyerId) form.setValue("buyerId", defaultBuyerId);
+    if (defaultBuyerId) form.setValue("leadId", defaultBuyerId);
     if (defaultListingId) form.setValue("listingId", defaultListingId);
   }, [defaultBuyerId, defaultListingId, form]);
 
@@ -137,7 +168,11 @@ export function VisitForm({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          leadId: values.leadId,
+          listingId: values.listingId,
+          scheduledAt: values.scheduledAt,
+        }),
       });
 
       if (!response.ok) {
@@ -170,7 +205,7 @@ export function VisitForm({
             {!hideBuyerSelect && (
               <FormField
                 control={form.control}
-                name="buyerId"
+                name="leadId"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Buyer</FormLabel>
@@ -204,7 +239,7 @@ export function VisitForm({
                                   value={buyer.name || ""}
                                   key={buyer.id}
                                   onSelect={() => {
-                                    form.setValue("buyerId", buyer.id);
+                                    form.setValue("leadId", buyer.id);
                                   }}
                                   className="flex flex-col items-start gap-1 py-3"
                                 >
@@ -307,7 +342,7 @@ export function VisitForm({
 
             <FormField
               control={form.control}
-              name="date"
+              name="scheduledAt"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Date & Time</FormLabel>

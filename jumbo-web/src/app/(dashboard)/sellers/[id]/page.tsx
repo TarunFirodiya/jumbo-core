@@ -1,6 +1,4 @@
-import { db } from "@/lib/db";
-import { sellerLeads } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import * as sellerLeadService from "@/services/seller-lead.service";
 import { SellerDetailView } from "@/components/sellers/detail/seller-detail-view";
 import type { SellerLeadWithRelations } from "@/types";
 
@@ -13,19 +11,7 @@ export default async function SellerPage({ params }: { params: Promise<{ id: str
     return <SellerDetailView sellerLead={null} id={id} />;
   }
 
-  const sellerLead = await db.query.sellerLeads.findFirst({
-    where: and(
-      eq(sellerLeads.id, id),
-      sql`${sellerLeads.deletedAt} IS NULL`
-    ),
-    with: {
-      building: true,
-      unit: true,
-      assignedTo: true,
-      referredBy: true,
-      createdBy: true,
-    },
-  });
+  const sellerLead = await sellerLeadService.getSellerLeadById(id);
 
   if (!sellerLead) {
     return <SellerDetailView sellerLead={null} id={id} />;

@@ -21,9 +21,10 @@ export async function createBuilding(data: NewBuilding): Promise<Building> {
  * Get building by ID
  */
 export async function getBuildingById(id: string): Promise<Building | null> {
-  return db.query.buildings.findFirst({
+  const result = await db.query.buildings.findFirst({
     where: and(eq(buildings.id, id), isNull(buildings.deletedAt)),
   });
+  return result ?? null;
 }
 
 /**

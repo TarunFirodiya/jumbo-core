@@ -88,6 +88,7 @@ export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
         },
         source: values.source,
         status: values.status,
+        pipeline: false,
         secondaryPhone: values.secondaryPhone || undefined,
         assignedAgentId: values.assignedAgentId || undefined,
       };

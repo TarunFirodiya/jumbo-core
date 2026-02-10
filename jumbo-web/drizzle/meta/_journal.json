@@ -15,6 +15,13 @@
       "when": 1767009150395,
       "tag": "0001_loose_lily_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770631186516,
+      "tag": "0002_keen_polaris",
+      "breakpoints": true
     }
   ]
 }

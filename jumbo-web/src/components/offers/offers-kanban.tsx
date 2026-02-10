@@ -61,7 +61,7 @@ const COLUMNS: KanbanColumnProps[] = [
 ];
 
 interface OffersKanbanProps {
-  data: Offer[];
+  data: (Offer & Record<string, any>)[];
 }
 
 export function OffersKanban({ data: initialData }: OffersKanbanProps) {

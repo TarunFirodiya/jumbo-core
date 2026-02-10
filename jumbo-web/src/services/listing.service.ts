@@ -170,7 +170,7 @@ export async function getListings(
   }
 
   if (status) {
-    conditions.push(eq(listings.status, status));
+    conditions.push(eq(listings.status, status as any));
   }
 
   if (isVerified !== undefined) {

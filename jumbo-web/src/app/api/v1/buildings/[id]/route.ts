@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { buildings, units, listings, mediaItems } from "@/lib/db/schema";
+import { buildings, units, listings } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { logActivity, computeChanges } from "@/lib/audit";
@@ -36,13 +36,6 @@ export async function GET(
         },
         sellerLeads: {
           limit: 10,
-        },
-        mediaItems: {
-          where: sql`${mediaItems.deletedAt} IS NULL`,
-          orderBy: [mediaItems.order, mediaItems.createdAt],
-          with: {
-            uploadedBy: true,
-          },
         },
       },
     });

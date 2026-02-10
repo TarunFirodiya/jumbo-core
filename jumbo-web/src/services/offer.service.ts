@@ -38,7 +38,7 @@ export async function createOffer(data: {
  * Get offer by ID
  */
 export async function getOfferById(id: string): Promise<Offer | null> {
-  return db.query.offers.findFirst({
+  const result = await db.query.offers.findFirst({
     where: and(eq(offers.id, id), isNull(offers.deletedAt)),
     with: {
       listing: {
@@ -58,6 +58,7 @@ export async function getOfferById(id: string): Promise<Offer | null> {
       createdBy: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -76,7 +77,7 @@ export async function getOffers(
   }
 
   if (status) {
-    conditions.push(eq(offers.status, status));
+    conditions.push(eq(offers.status, status as any));
   }
 
   if (listingId) {

@@ -1,10 +1,6 @@
 import { BuyersPageContent } from "@/components/buyers/buyers-page-content";
 import * as leadService from "@/services/lead.service";
 import type { LeadWithRelations } from "@/types";
-import { startOfMonth } from "date-fns";
-import { db } from "@/lib/db";
-import { leads } from "@/lib/db/schema";
-import { count, ne, gt, sql, and } from "drizzle-orm";
 
 export default async function BuyersPage({
   searchParams,
@@ -17,29 +13,16 @@ export default async function BuyersPage({
   const status = params.status as string | undefined;
   const agentId = params.agentId as string | undefined;
 
-  // Fetch data and stats in parallel
-  const [leadsResult, activeResult, newResult] = await Promise.all([
+  // Fetch data and stats in parallel using services
+  const [leadsResult, stats] = await Promise.all([
     leadService.getLeads({
       page,
       limit,
       status: status && status !== "all" ? status : undefined,
       agentId: agentId && agentId !== "all" ? agentId : undefined,
     }),
-    // Get active buyers count
-    db.select({ count: count() })
-      .from(leads)
-      .where(and(sql`${leads.deletedAt} IS NULL`, ne(leads.status, "closed"))),
-    // Get new this month count
-    db.select({ count: count() })
-      .from(leads)
-      .where(and(sql`${leads.deletedAt} IS NULL`, gt(leads.createdAt, startOfMonth(new Date())))),
+    leadService.getBuyerStats(),
   ]);
-
-  const stats = {
-    totalBuyers: leadsResult.pagination.total,
-    activeBuyers: activeResult[0].count,
-    newThisMonth: newResult[0].count,
-  };
 
   return (
     <BuyersPageContent

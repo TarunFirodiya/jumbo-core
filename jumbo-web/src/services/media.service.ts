@@ -44,12 +44,13 @@ export async function uploadMedia(data: {
  * Get media item by ID
  */
 export async function getMediaById(id: string): Promise<MediaItem | null> {
-  return db.query.mediaItems.findFirst({
+  const result = await db.query.mediaItems.findFirst({
     where: and(eq(mediaItems.id, id), isNull(mediaItems.deletedAt)),
     with: {
       uploadedBy: true,
     },
   });
+  return result ?? null;
 }
 
 /**

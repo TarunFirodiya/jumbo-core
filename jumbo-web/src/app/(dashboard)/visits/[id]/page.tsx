@@ -1,6 +1,4 @@
-import { db } from "@/lib/db";
-import { visits, listings, units, buildings, leads, profiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import * as visitService from "@/services/visit.service";
 import { VisitDetailView } from "@/components/visits/detail/visit-detail-view";
 import type { VisitDetail } from "@/components/visits/detail/visit-detail-view";
 
@@ -13,38 +11,21 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
       return <VisitDetailView visit={null} id={id} />;
   }
 
-  // Fetch visit with relations from DB
-  const visitData = await db.query.visits.findFirst({
-    where: eq(visits.id, id),
-    with: {
-        listing: {
-            with: {
-                unit: {
-                    with: {
-                        building: true,
-                    }
-                }
-            }
-        },
-        lead: {
-            with: {
-                profile: true,
-                assignedAgent: true,
-            }
-        }
-    }
-  });
+  // Fetch visit with relations using service
+  const visitData = await visitService.getVisitById(id);
 
   if (!visitData) {
     return <VisitDetailView visit={null} id={id} />;
   }
 
   // Transform to VisitDetail
-  const buildingName = visitData.listing?.unit?.building?.name || "Unknown Building";
-  const locality = visitData.listing?.unit?.building?.locality || "";
-  const city = visitData.listing?.unit?.building?.city || "";
+  // Cast to any to work around Drizzle's union type inference for nested relations
+  const v = visitData as any;
+  const buildingName = v.listing?.unit?.building?.name || "Unknown Building";
+  const locality = v.listing?.unit?.building?.locality || "";
+  const city = v.listing?.unit?.building?.city || "";
   const address = [locality, city].filter(Boolean).join(", ");
-  const propertyImage = visitData.listing?.images?.[0] || "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&auto=format&fit=crop&q=60";
+  const propertyImage = v.listing?.images?.[0] || "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&auto=format&fit=crop&q=60";
 
   const visit: VisitDetail = {
     id: visitData.id,
@@ -58,12 +39,12 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
       time: visitData.scheduledAt ? new Date(visitData.scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "",
     },
     agent: {
-      name: visitData.lead?.assignedAgent?.fullName || "Unassigned",
-      image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${visitData.lead?.assignedAgent?.fullName || "Agent"}`,
+      name: v.lead?.assignedAgent?.fullName || "Unassigned",
+      image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${v.lead?.assignedAgent?.fullName || "Agent"}`,
     },
     client: {
-      name: visitData.lead?.profile?.fullName || "Unknown Client",
-      type: visitData.lead?.status ? visitData.lead.status.charAt(0).toUpperCase() + visitData.lead.status.slice(1) : "New Lead",
+      name: v.lead?.profile?.fullName || "Unknown Client",
+      type: v.lead?.status ? v.lead.status.charAt(0).toUpperCase() + v.lead.status.slice(1) : "New Lead",
     },
     status: (visitData.status as any) || "Pending",
     feedback: visitData.feedbackText || undefined,

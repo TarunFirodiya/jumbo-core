@@ -28,7 +28,7 @@ export async function createInspection(data: NewHomeInspection): Promise<HomeIns
  * Get inspection by ID
  */
 export async function getInspectionById(id: string): Promise<HomeInspection | null> {
-  return db.query.homeInspections.findFirst({
+  const result = await db.query.homeInspections.findFirst({
     where: eq(homeInspections.id, id),
     with: {
       listing: {
@@ -43,6 +43,7 @@ export async function getInspectionById(id: string): Promise<HomeInspection | nu
       inspectedBy: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -74,7 +75,7 @@ export async function getInspections(
   }
 
   if (status) {
-    conditions.push(eq(homeInspections.status, status));
+    conditions.push(eq(homeInspections.status, status as any));
   }
 
   if (inspectedById) {

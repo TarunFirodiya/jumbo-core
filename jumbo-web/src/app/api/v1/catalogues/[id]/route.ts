@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { homeCatalogues, mediaItems } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { homeCatalogues } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { requireAuth } from "@/lib/auth";
 import { logActivity, computeChanges } from "@/lib/audit";
 import { updateCatalogueSchema, approveCatalogueSchema } from "@/lib/validations/catalogue";
@@ -35,13 +35,6 @@ export async function GET(
           },
         },
         cataloguedBy: true,
-        mediaItems: {
-          where: sql`${mediaItems.deletedAt} IS NULL`,
-          orderBy: [mediaItems.order, mediaItems.createdAt],
-          with: {
-            uploadedBy: true,
-          },
-        },
       },
     });
 

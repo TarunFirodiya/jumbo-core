@@ -1,6 +1,4 @@
-import { db } from "@/lib/db";
-import { leads } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import * as leadService from "@/services/lead.service";
 import { BuyerDetailView } from "@/components/buyers/detail/buyer-detail-view";
 import type { BuyerDetail } from "@/components/buyers/detail/buyer-detail-view";
 
@@ -13,13 +11,7 @@ export default async function BuyerPage({ params }: { params: Promise<{ id: stri
     return <BuyerDetailView buyer={null} id={id} />;
   }
 
-  const lead = await db.query.leads.findFirst({
-    where: eq(leads.id, id),
-    with: {
-      profile: true,
-      assignedAgent: true,
-    }
-  });
+  const lead = await leadService.getLeadByIdWithRelations(id);
 
   if (!lead) {
      return <BuyerDetailView buyer={null} id={id} />;

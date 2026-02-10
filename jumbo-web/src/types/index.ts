@@ -66,7 +66,7 @@ export type {
   OfferStatus,
 } from "@/lib/db/schema";
 
-import { Profile, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer } from "@/lib/db/schema";
+import { Profile, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer, BuyerEvent } from "@/lib/db/schema";
 
 export type LeadWithRelations = Lead & {
   profile: Profile | null;

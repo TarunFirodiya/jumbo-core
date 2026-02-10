@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 import { leads, profiles, notes, type NewLead, type Lead } from "@/lib/db/schema";
-import { eq, and, sql, desc, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, isNull, ne, gte } from "drizzle-orm";
 import type { LeadFilters, PaginatedResult } from "./types";
 import { NotFoundError } from "./errors";
 import * as profileService from "./profile.service";
@@ -85,13 +85,14 @@ export async function createLeadWithProfile(data: {
  * Get lead by ID
  */
 export async function getLeadById(id: string): Promise<Lead | null> {
-  return db.query.leads.findFirst({
+  const result = await db.query.leads.findFirst({
     where: and(eq(leads.id, id), isNull(leads.deletedAt)),
     with: {
       profile: true,
       assignedAgent: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -133,7 +134,7 @@ export async function getLeads(
   }
 
   if (status) {
-    conditions.push(eq(leads.status, status));
+    conditions.push(eq(leads.status, status as any));
   }
 
   if (source) {
@@ -375,13 +376,14 @@ export async function findLeadByExternalId(
   externalId: string,
   source: string
 ): Promise<Lead | null> {
-  return db.query.leads.findFirst({
+  const result = await db.query.leads.findFirst({
     where: and(eq(leads.externalId, externalId), eq(leads.source, source)),
     with: {
       profile: true,
       assignedAgent: true,
     },
   });
+  return result ?? null;
 }
 
 /**
@@ -394,5 +396,45 @@ export async function getLeadCountByAgent(agentId: string): Promise<number> {
     .where(and(eq(leads.assignedAgentId, agentId), isNull(leads.deletedAt)));
 
   return Number(result[0]?.count ?? 0);
+}
+
+/**
+ * Get buyer dashboard stats
+ * Returns stats for the buyers page
+ */
+export async function getBuyerStats(): Promise<{
+  totalBuyers: number;
+  activeBuyers: number;
+  newThisMonth: number;
+}> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const [totalResult, activeResult, newResult] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(isNull(leads.deletedAt)),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(and(isNull(leads.deletedAt), ne(leads.status, "closed"))),
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(
+        and(
+          isNull(leads.deletedAt),
+          gte(leads.createdAt, startOfMonth)
+        )
+      ),
+  ]);
+
+  return {
+    totalBuyers: Number(totalResult[0]?.count ?? 0),
+    activeBuyers: Number(activeResult[0]?.count ?? 0),
+    newThisMonth: Number(newResult[0]?.count ?? 0),
+  };
 }
 

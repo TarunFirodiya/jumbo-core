@@ -1,11 +1,9 @@
 import { z } from "zod";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { listings, buildings, units } from "@/lib/db/schema";
+import { listings } from "@/lib/db/schema";
 
-// Enum definitions for listing fields
+// Enum definitions for listing fields (viewEnum, facingEnum defined in unit.ts)
 export const configurationEnum = z.enum(["1BHK", "2BHK", "3BHK", "4BHK", "5BHK", "Studio", "Villa", "Penthouse"]);
-export const viewEnum = z.enum(["park", "road", "pool", "garden", "city", "lake", "other"]);
-export const facingEnum = z.enum(["north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest"]);
 export const uspEnum = z.enum(["corner_unit", "high_floor", "parking", "balcony", "modern_kitchen", "spacious", "natural_light", "other"]);
 export const propertyTypeEnum = z.enum(["apartment", "villa", "penthouse", "plot", "commercial"]);
 export const occupancyEnum = z.enum(["ready_to_move", "under_construction", "new_launch"]);
@@ -18,19 +16,6 @@ export const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
 // Base schemas from Drizzle
 export const insertListingSchema = createInsertSchema(listings);
 export const selectListingSchema = createSelectSchema(listings);
-
-export const insertBuildingSchema = createInsertSchema(buildings, {
-  name: z.string().min(2, "Building name is required"),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  amenitiesJson: z.record(z.string(), z.boolean()).optional(),
-});
-
-export const insertUnitSchema = createInsertSchema(units, {
-  bhk: z.number().min(0.5).max(10),
-  floorNumber: z.number().int().min(-5).max(100),
-  carpetArea: z.number().positive(),
-});
 
 // API request schemas
 export const createListingRequestSchema = z.object({

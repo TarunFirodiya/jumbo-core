@@ -18,9 +18,10 @@ import { RuleNotFoundError, NotFoundError } from "./errors";
  * Get credit rule by action type
  */
 export async function getCreditRule(actionType: string): Promise<CreditRule | null> {
-  return db.query.creditRules.findFirst({
+  const result = await db.query.creditRules.findFirst({
     where: eq(creditRules.actionType, actionType),
   });
+  return result ?? null;
 }
 
 /**
