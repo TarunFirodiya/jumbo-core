@@ -25,7 +25,6 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const { user, profile } = await requireAuth();
     if (!user || !profile) {
       return NextResponse.json(
@@ -74,7 +73,6 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const { user, profile } = await requireAuth();
     if (!user || !profile) {
       return NextResponse.json(
@@ -150,11 +148,9 @@ export async function PUT(
     const validatedData = updateLeadSchema.parse(body);
     const updateData: Record<string, unknown> = {};
 
-    if (validatedData.profileId !== undefined) updateData.profileId = validatedData.profileId;
     if (validatedData.leadId !== undefined) updateData.leadId = validatedData.leadId;
     if (validatedData.source !== undefined) updateData.source = validatedData.source;
     if (validatedData.externalId !== undefined) updateData.externalId = validatedData.externalId;
-    if (validatedData.secondaryPhone !== undefined) updateData.secondaryPhone = validatedData.secondaryPhone;
     if (validatedData.sourceListingId !== undefined) updateData.sourceListingId = validatedData.sourceListingId;
     if (validatedData.dropReason !== undefined) updateData.dropReason = validatedData.dropReason;
     if (validatedData.locality !== undefined) updateData.locality = validatedData.locality;
@@ -169,7 +165,7 @@ export async function PUT(
     const updatedLead = await leadService.updateLead(id, updateData);
 
     // Log the update
-    const changes = computeChanges(existingLead as Record<string, unknown>, updatedLead as Record<string, unknown>);
+    const changes = computeChanges(existingLead as unknown as Record<string, unknown>, updatedLead as unknown as Record<string, unknown>);
     if (changes) {
       await logActivity({
         entityType: "lead",
@@ -214,7 +210,6 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const { user, profile } = await requireAuth();
     if (!user || !profile) {
       return NextResponse.json(
@@ -223,7 +218,6 @@ export async function DELETE(
       );
     }
 
-    // Check permissions - only super_admin can delete
     if (profile.role !== "super_admin") {
       return NextResponse.json(
         { error: "Forbidden", message: "Only super admins can delete leads" },
@@ -231,7 +225,6 @@ export async function DELETE(
       );
     }
 
-    // Check if lead exists
     const existingLead = await leadService.getLeadById(id);
 
     if (!existingLead) {
@@ -241,10 +234,8 @@ export async function DELETE(
       );
     }
 
-    // Soft delete using service
     await leadService.deleteLead(id);
 
-    // Log the deletion
     await logActivity({
       entityType: "lead",
       entityId: id,

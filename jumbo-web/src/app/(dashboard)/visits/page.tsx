@@ -59,7 +59,7 @@ export default async function VisitsPage() {
         image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${v.lead?.assignedAgent?.fullName || v.assignedVa?.fullName || "Agent"}`,
       },
       client: {
-        name: v.lead?.profile?.fullName || "Unknown Client",
+        name: v.lead?.contact?.name || "Unknown Client",
         type: v.lead?.status || "New Lead",
       },
       status: visit.status ? visit.status.charAt(0).toUpperCase() + visit.status.slice(1) : "Pending",

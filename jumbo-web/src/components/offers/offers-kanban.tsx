@@ -47,7 +47,7 @@ interface KanbanOffer extends KanbanItemProps {
       } | null;
     } | null;
     lead?: {
-      profile?: { fullName: string | null } | null;
+      contact?: { name: string | null } | null;
     } | null;
     createdBy?: { fullName: string | null } | null;
   };
@@ -87,7 +87,7 @@ export function OffersKanban({ data: initialData }: OffersKanbanProps) {
     return offers
       .filter((offer) => {
         const buildingName = offer.listing?.unit?.building?.name || "";
-        const buyerName = offer.lead?.profile?.fullName || "";
+        const buyerName = offer.lead?.contact?.name || "";
         const agentName = offer.createdBy?.fullName || "";
         
         const matchesSearch =
@@ -233,7 +233,7 @@ export function OffersKanban({ data: initialData }: OffersKanbanProps) {
                 {(item: KanbanOffer) => {
                   const offer = item.original;
                   const buildingName = offer.listing?.unit?.building?.name || "Unknown Building";
-                  const buyerName = offer.lead?.profile?.fullName || "Unknown Buyer";
+                  const buyerName = offer.lead?.contact?.name || "Unknown Buyer";
                   const agentName = offer.createdBy?.fullName || "Unassigned";
                   const agentInitials = agentName
                     ? agentName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)

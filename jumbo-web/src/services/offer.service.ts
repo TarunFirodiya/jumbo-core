@@ -52,7 +52,7 @@ export async function getOfferById(id: string): Promise<Offer | null> {
       },
       lead: {
         with: {
-          profile: true,
+          contact: true,
         },
       },
       createdBy: true,
@@ -105,7 +105,7 @@ export async function getOffers(
         },
         lead: {
           with: {
-            profile: true,
+            contact: true,
           },
         },
         createdBy: true,
@@ -142,7 +142,7 @@ export async function getOffersByListing(listingId: string): Promise<Offer[]> {
     with: {
       lead: {
         with: {
-          profile: true,
+          contact: true,
         },
       },
       createdBy: true,

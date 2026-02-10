@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { leads } from "@/lib/db/schema";
 import { indianPhoneSchema } from "./common";
 
 // Lead source options (same as seller leads + manual entry options)
@@ -26,35 +24,21 @@ export const leadStatusOptions = [
   { value: "closed", label: "Closed" },
 ] as const;
 
-// Base schemas from Drizzle
-export const insertLeadSchema = createInsertSchema(leads, {
-  source: z.string().min(1, "Source is required"),
-  status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]).default("new"),
-  requirementJson: z.object({
-    bhk: z.array(z.number()).optional(),
-    budget_min: z.number().positive().optional(),
-    budget_max: z.number().positive().optional(),
-    localities: z.array(z.string()).optional(),
-  }).optional(),
-});
-
-export const selectLeadSchema = createSelectSchema(leads);
-
 // API request schemas
+// Contact info (fullName, phone, email) is used to create/find a Contact.
+// No secondaryPhone — that now goes in contacts.metadata.
 export const createLeadRequestSchema = z.object({
-  // Profile info (will create or find existing profile)
+  // Contact info — used to create/find contact
   profile: z.object({
     fullName: z.string().min(2, "Name must be at least 2 characters"),
     phone: indianPhoneSchema,
     email: z.string().email().optional().nullable(),
   }),
   // Lead specific info
-  profileId: z.string().uuid().optional().nullable(),
   leadId: z.string().optional(),
   source: z.string().min(1, "Source is required"),
   status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]).default("new"),
   externalId: z.string().optional(),
-  secondaryPhone: indianPhoneSchema.optional().nullable(),
   sourceListingId: z.string().optional().nullable(),
   dropReason: z.string().optional().nullable(),
   locality: z.string().optional(),
@@ -88,7 +72,6 @@ export const createLeadFormSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   phone: indianPhoneSchema,
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  secondaryPhone: indianPhoneSchema.optional().or(z.literal("")),
   source: z.enum(["website", "99acres", "magicbricks", "housing", "nobroker", "mygate", "referral", "manual_entry", "walk_in", "phone_inquiry"]),
   status: z.enum(["new", "contacted", "active_visitor", "at_risk", "closed"]).default("new"),
   assignedAgentId: z.string().uuid().optional().nullable(),
@@ -133,4 +116,3 @@ export type UpdateLeadStatus = z.infer<typeof updateLeadStatusSchema>;
 export type AssignLead = z.infer<typeof assignLeadSchema>;
 export type HousingWebhook = z.infer<typeof housingWebhookSchema>;
 export type LeadQuery = z.infer<typeof leadQuerySchema>;
-

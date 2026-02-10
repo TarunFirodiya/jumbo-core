@@ -51,7 +51,7 @@ export async function getVisitById(id: string): Promise<Visit | null> {
       },
       lead: {
         with: {
-          profile: true,
+          contact: true,
           assignedAgent: true,
         },
       },
@@ -109,7 +109,7 @@ export async function getVisits(
         },
         lead: {
           with: {
-            profile: true,
+            contact: true,
             assignedAgent: true,
           },
         },
@@ -445,7 +445,7 @@ export async function getVisitsByListing(listingId: string): Promise<Visit[]> {
     with: {
       lead: {
         with: {
-          profile: true,
+          contact: true,
         },
       },
       tour: true,
@@ -468,7 +468,7 @@ export async function getVisitOptions(): Promise<
     with: {
       lead: {
         with: {
-          profile: true,
+          contact: true,
         },
       },
       listing: {
@@ -487,7 +487,7 @@ export async function getVisitOptions(): Promise<
 
   return visitList.map((v) => ({
     id: v.id,
-    label: `${v.lead?.profile?.fullName ?? "Unknown"} - ${v.listing?.unit?.building?.name ?? "Unknown"}`,
+    label: `${v.lead?.contact?.name ?? "Unknown"} - ${v.listing?.unit?.building?.name ?? "Unknown"}`,
     scheduledAt: v.scheduledAt,
   }));
 }

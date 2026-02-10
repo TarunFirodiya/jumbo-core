@@ -3,11 +3,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import type { Profile } from "@/lib/db/schema";
+import type { TeamMember } from "@/lib/db/schema";
 
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  profile: TeamMember | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -16,7 +16,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -49,14 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function fetchProfile(userId: string) {
     try {
-      // Fetch current user's profile
+      // Fetch current user's team member record
       const response = await fetch(`/api/v1/profile`);
       if (response.ok) {
         const data = await response.json();
         setProfile(data.data || null);
       } else if (response.status === 404 || response.status === 401) {
         // Profile doesn't exist, try to sync/create it
-        console.log("Profile not found, attempting to sync...");
+        console.log("Team member record not found, attempting to sync...");
         const syncResponse = await fetch(`/api/v1/profile/sync`, {
           method: "POST",
         });
@@ -92,4 +92,3 @@ export function useAuth() {
   }
   return context;
 }
-

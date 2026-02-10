@@ -8,8 +8,9 @@ import { useListingWizardStore } from "@/store/listing-wizard-store";
 import { BuildingStep } from "./steps/building-step";
 import { UnitStep } from "./steps/unit-step";
 import { ListingStep } from "./steps/listing-step";
-import { Check, Building2, Home, IndianRupee, ChevronLeft } from "lucide-react";
+import { Check, Building2, Home, IndianRupee, ChevronLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const steps = [
   { id: 1, title: "Building", description: "Select or add building", icon: Building2 },
@@ -26,14 +27,49 @@ export function ListingWizard() {
   const nextStep = useListingWizardStore((state) => state.nextStep);
   const prevStep = useListingWizardStore((state) => state.prevStep);
   const resetWizard = useListingWizardStore((state) => state.resetWizard);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleSubmit = () => {
-    // In a real app, this would call a server action to create the listing
-    console.log("Creating listing:", { building, unit, listing });
-    
-    // Reset wizard and navigate back to listings
-    resetWizard();
-    router.push("/listings");
+  const handleSubmit = async () => {
+    if (!building || !unit || !listing) return;
+
+    setIsSubmitting(true);
+    try {
+      // Build the request payload matching createListingRequestSchema
+      const payload: Record<string, unknown> = {
+        building: building.isNew
+          ? { name: building.name, locality: building.locality, city: building.city }
+          : { id: building.id },
+        unit: {
+          unitNumber: unit.unitNumber || undefined,
+          bhk: unit.bhk,
+          floorNumber: unit.floorNumber || undefined,
+          carpetArea: unit.carpetArea || undefined,
+        },
+        askingPrice: listing.askingPrice,
+      };
+
+      const response = await fetch("/api/v1/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to create listing");
+      }
+
+      toast.success("Listing created successfully");
+      resetWizard();
+      router.push("/listings");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create listing"
+      );
+      console.error("Error creating listing:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const canProceed = () => {
@@ -154,7 +190,8 @@ export function ListingWizard() {
             Continue
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={!canProceed()}>
+          <Button onClick={handleSubmit} disabled={!canProceed() || isSubmitting}>
+            {isSubmitting && <Loader2 className="size-4 mr-2 animate-spin" />}
             Create Listing
           </Button>
         )}

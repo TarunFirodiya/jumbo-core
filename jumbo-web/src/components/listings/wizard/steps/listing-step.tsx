@@ -11,8 +11,15 @@ import {
   availableAmenities,
 } from "@/store/listing-wizard-store";
 import { Separator } from "@/components/ui/separator";
-import { formatINR } from "@/mock-data/listings";
 import { IndianRupee, Image, Sparkles, Upload, X } from "lucide-react";
+
+/** Format a number in Indian Rupee notation (e.g., 1,50,00,000 → ₹1.5 Cr) */
+function formatINR(value: number): string {
+  if (!value || isNaN(value)) return "";
+  if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)} Cr`;
+  if (value >= 100000) return `₹${(value / 100000).toFixed(2)} L`;
+  return `₹${value.toLocaleString("en-IN")}`;
+}
 import { cn } from "@/lib/utils";
 
 export function ListingStep() {
@@ -62,15 +69,20 @@ export function ListingStep() {
     ? formatINR(parseInt(price.replace(/,/g, "")))
     : "";
 
-  // Mock image upload
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const handleImageUpload = () => {
-    // In a real app, this would open a file picker
-    // For now, add a random placeholder image
-    const randomId = Math.random().toString(36).substring(7);
-    setImageUrls((prev) => [
-      ...prev,
-      `https://picsum.photos/seed/${randomId}/400/300`,
-    ]);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    // Create local preview URLs for the selected files
+    const newUrls = Array.from(files).map((file) => URL.createObjectURL(file));
+    setImageUrls((prev) => [...prev, ...newUrls]);
+    // Reset the input so re-selecting the same file triggers onChange
+    e.target.value = "";
   };
 
   const removeImage = (index: number) => {
@@ -169,6 +181,14 @@ export function ListingStep() {
             <Upload className="size-6 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Add Image</span>
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           Upload high-quality images. First image will be used as the cover.

@@ -4,7 +4,6 @@ import { logActivity, computeChanges } from "@/lib/audit";
 import { createSellerLeadSchema } from "@/lib/validations/seller";
 import { z } from "zod";
 import * as sellerLeadService from "@/services/seller-lead.service";
-import * as profileService from "@/services/profile.service";
 
 /**
  * GET /api/v1/seller-leads
@@ -13,7 +12,6 @@ import * as profileService from "@/services/profile.service";
 export const GET = withAuth(
   async (request: NextRequest, { profile }) => {
     try {
-      // Ensure profile exists
       if (!profile) {
         throw new Error("User profile not found");
       }
@@ -25,7 +23,6 @@ export const GET = withAuth(
       const source = searchParams.get("source");
       const assignedToId = searchParams.get("assignedToId");
 
-      // Filter by assigned agent if user is not super_admin or team_lead
       let effectiveAssignedToId = assignedToId;
       if (profile.role !== "super_admin" && profile.role !== "team_lead") {
         effectiveAssignedToId = profile.id;
@@ -54,56 +51,38 @@ export const GET = withAuth(
 
 /**
  * POST /api/v1/seller-leads
- * Create a new seller lead
+ * Create a new seller lead.
+ * Creates/finds a Contact by phone, then creates the seller lead referencing it.
  */
 export const POST = withAuth<{ data: unknown; message: string } | { error: string; message: string; details?: unknown }>(
-  async (request: NextRequest, { user, profile }) => {
+  async (request: NextRequest, { user }) => {
     try {
       const body = await request.json();
       const validatedData = createSellerLeadSchema.parse(body);
 
-      // Create or link profile if profileId provided
-      let profileId = validatedData.profileId;
-      if (!profileId) {
-        // Check if profile exists by phone
-        const existingProfile = await profileService.getProfileByPhone(validatedData.phone);
-        
-        if (existingProfile) {
-          profileId = existingProfile.id;
-        } else {
-          // Create new profile
-          const newProfile = await profileService.createProfile({
-            fullName: validatedData.name,
-            phone: validatedData.phone,
-            email: validatedData.email || null,
-          });
-          profileId = newProfile.id;
-        }
-      }
-
-      // Create the seller lead
-      const newLead = await sellerLeadService.createSellerLead({
-        profileId: profileId || null,
-        name: validatedData.name,
-        phone: validatedData.phone,
-        email: validatedData.email || null,
-        secondaryPhone: validatedData.secondaryPhone || null,
-        status: validatedData.status,
+      // Create seller lead with contact
+      const newLead = await sellerLeadService.createSellerLeadWithContact({
+        contact: {
+          name: validatedData.name,
+          phone: validatedData.phone,
+          email: validatedData.email || undefined,
+        },
         source: validatedData.source,
-        sourceUrl: validatedData.sourceUrl || null,
-        sourceListingUrl: validatedData.sourceListingUrl || null,
-        dropReason: validatedData.dropReason || null,
-        referredById: validatedData.referredById || null,
-        buildingId: validatedData.buildingId || null,
-        unitId: validatedData.unitId || null,
-        assignedToId: validatedData.assignedToId || null,
-        followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : null,
+        status: validatedData.status,
+        sourceUrl: validatedData.sourceUrl || undefined,
+        sourceListingUrl: validatedData.sourceListingUrl || undefined,
+        dropReason: validatedData.dropReason || undefined,
+        referredById: validatedData.referredById || undefined,
+        buildingId: validatedData.buildingId || undefined,
+        unitId: validatedData.unitId || undefined,
+        assignedToId: validatedData.assignedToId || undefined,
+        followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : undefined,
         isNri: validatedData.isNri,
         createdById: user.id,
       });
 
       // Log the creation
-      const changes = computeChanges(null, newLead);
+      const changes = computeChanges(null, newLead as unknown as Record<string, unknown>);
       await logActivity({
         entityType: "seller_lead",
         entityId: newLead.id,

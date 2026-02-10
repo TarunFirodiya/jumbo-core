@@ -34,13 +34,13 @@ export default async function BuyerPage({ params }: { params: Promise<{ id: stri
       budgetStr = `Max ₹${(budgetMax/100000).toFixed(0)}L`;
   }
 
-  const profile = Array.isArray(lead.profile) ? lead.profile[0] : lead.profile;
+  const contact = Array.isArray(lead.contact) ? lead.contact[0] : lead.contact;
   const assignedAgent = Array.isArray(lead.assignedAgent) ? lead.assignedAgent[0] : lead.assignedAgent;
   
   const buyer: BuyerDetail = {
     id: lead.id,
-    name: profile?.fullName || "Unknown",
-    location: profile?.territoryId || "Unknown Location",
+    name: contact?.name || "Unknown",
+    location: "Unknown Location", // TODO: derive from contact metadata or lead zone
     addedDate: lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
     status: lead.status?.charAt(0).toUpperCase() + (lead.status?.slice(1) || "") || "New",
     assignedAgent: {
@@ -52,9 +52,9 @@ export default async function BuyerPage({ params }: { params: Promise<{ id: stri
     nextFollowUp: "Pending", // TODO: Fetch from tasks
     source: lead.source || "Unknown",
     contact: {
-      whatsapp: profile?.phone || "",
-      mobile: profile?.phone || "",
-      email: profile?.email || "",
+      whatsapp: contact?.phone || "",
+      mobile: contact?.phone || "",
+      email: contact?.email || "",
     },
     preferences: {
       budget: budgetStr,

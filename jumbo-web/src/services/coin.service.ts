@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import {
   creditLedger,
   creditRules,
-  profiles,
+  team,
   type CreditLedgerEntry,
   type CreditRule,
 } from "@/lib/db/schema";
@@ -28,11 +28,11 @@ export async function getCreditRule(actionType: string): Promise<CreditRule | nu
  * Get coin balance for an agent
  */
 export async function getCoinBalance(agentId: string): Promise<number> {
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, agentId),
+  const member = await db.query.team.findFirst({
+    where: eq(team.id, agentId),
   });
 
-  return profile?.totalCoins ?? 0;
+  return member?.totalCoins ?? 0;
 }
 
 /**
@@ -65,13 +65,13 @@ export async function awardCoins(
     throw new RuleNotFoundError(actionType);
   }
 
-  // Get current profile
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, agentId),
+  // Get current team member
+  const member = await db.query.team.findFirst({
+    where: eq(team.id, agentId),
   });
 
-  if (!profile) {
-    throw new NotFoundError("Profile", agentId);
+  if (!member) {
+    throw new NotFoundError("TeamMember", agentId);
   }
 
   // Create ledger entry
@@ -83,12 +83,12 @@ export async function awardCoins(
     notes: notes ?? null,
   });
 
-  // Update cached balance in profile
-  const newBalance = (profile.totalCoins ?? 0) + rule.coinValue;
+  // Update cached balance in team member
+  const newBalance = (member.totalCoins ?? 0) + rule.coinValue;
   await db
-    .update(profiles)
+    .update(team)
     .set({ totalCoins: newBalance })
-    .where(eq(profiles.id, agentId));
+    .where(eq(team.id, agentId));
 
   return {
     newBalance,
@@ -135,4 +135,3 @@ export async function updateCreditRule(
 export async function getAllCreditRules(): Promise<CreditRule[]> {
   return db.query.creditRules.findMany({});
 }
-

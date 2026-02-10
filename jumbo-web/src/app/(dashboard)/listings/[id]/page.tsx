@@ -93,8 +93,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           {listingData.owner && <SellerCard seller={listingData.owner} />}
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">
-              <ListingVisits />
-              <ActiveOffers />
+              <ListingVisits visits={(l.visits || []) as any[]} />
+              <ActiveOffers offers={(l.offers || []) as any[]} />
           </div>
         </div>
       </div>

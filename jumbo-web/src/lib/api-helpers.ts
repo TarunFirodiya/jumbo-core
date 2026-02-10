@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePermission, requireAuth } from "@/lib/auth";
 import type { Permission } from "@/lib/rbac";
 import type { User } from "@supabase/supabase-js";
-import type { Profile } from "@/lib/db/schema";
+import type { TeamMember } from "@/lib/db/schema";
 
 /**
  * Helper to protect API routes with authentication and RBAC
  */
 export function withAuth<T = unknown>(
-  handler: (request: NextRequest, context: { user: User; profile: Profile }) => Promise<T | NextResponse<T>>,
+  handler: (request: NextRequest, context: { user: User; profile: TeamMember }) => Promise<T | NextResponse<T>>,
   permission?: Permission
 ) {
   return async (request: NextRequest): Promise<NextResponse<T | { error: string; message: string }>> => {

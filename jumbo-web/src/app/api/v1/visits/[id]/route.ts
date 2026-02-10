@@ -28,7 +28,7 @@ export async function GET(
       with: {
         lead: {
           with: {
-            profile: true,
+            contact: true,
             assignedAgent: true,
           },
         },
@@ -148,7 +148,7 @@ export async function PUT(
     const visitWithRelations = await db.query.visits.findFirst({
       where: eq(visits.id, id),
       with: {
-        lead: { with: { profile: true } },
+        lead: { with: { contact: true } },
         listing: { with: { unit: { with: { building: true } } } },
       },
     });
@@ -301,7 +301,7 @@ export async function POST(
         const visitWithRelations = await db.query.visits.findFirst({
           where: eq(visits.id, newVisit.id),
           with: {
-            lead: { with: { profile: true } },
+            lead: { with: { contact: true } },
             listing: { with: { unit: { with: { building: true } } } },
           },
         });
@@ -356,7 +356,7 @@ export async function POST(
     const visitWithRelations = await db.query.visits.findFirst({
       where: eq(visits.id, id),
       with: {
-        lead: { with: { profile: true } },
+        lead: { with: { contact: true } },
         listing: { with: { unit: { with: { building: true } } } },
       },
     });

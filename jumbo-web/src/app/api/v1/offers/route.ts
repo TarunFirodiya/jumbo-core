@@ -18,13 +18,18 @@ export const GET = withAuth<{ data: unknown[] } | { error: string; message: stri
         status: searchParams.get("status") || undefined,
       });
 
+      const page = Number(searchParams.get("page")) || 1;
+      const limit = Number(searchParams.get("limit")) || 50;
+
       const result = await offerService.getOffers({
         listingId: query.listingId,
         leadId: query.leadId,
         status: query.status,
+        page,
+        limit,
       });
 
-      return NextResponse.json({ data: result.data });
+      return NextResponse.json({ data: result.data, pagination: result.pagination });
     } catch (error) {
       console.error("Error fetching offers:", error);
       return NextResponse.json(

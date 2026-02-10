@@ -28,19 +28,19 @@ interface BuyersTableProps {
 
 export const columns: ColumnDef<LeadWithRelations>[] = [
   {
-    id: "profile.fullName",
-    accessorKey: "profile.fullName",
+    id: "contact.name",
+    accessorKey: "contact.name",
     header: "Buyer Name",
     cell: ({ row }) => (
       <Link href={`/buyers/${row.original.id}`} className="font-medium truncate hover:underline block">
-        {row.original.profile?.fullName || "Unknown"}
+        {row.original.contact?.name || "Unknown"}
       </Link>
     ),
   },
   {
-    accessorKey: "profile.email",
+    accessorKey: "contact.email",
     header: "Email",
-    cell: ({ row }) => <div className="text-muted-foreground truncate">{row.original.profile?.email || "-"}</div>,
+    cell: ({ row }) => <div className="text-muted-foreground truncate">{row.original.contact?.email || "-"}</div>,
   },
   {
     accessorKey: "status",
@@ -115,5 +115,5 @@ export const columns: ColumnDef<LeadWithRelations>[] = [
 ];
 
 export function BuyersTable({ data }: BuyersTableProps) {
-  return <DataTable columns={columns} data={data} filterColumn="profile.fullName" />;
+  return <DataTable columns={columns} data={data} filterColumn="contact.name" />;
 }

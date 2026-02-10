@@ -65,15 +65,18 @@ export function SellersKanban({ data: initialData }: SellersKanbanProps) {
   const filteredData: KanbanSellerLead[] = useMemo(() => {
     return allLeads
       .filter((lead) => {
+        const contactName = lead.contact?.name || "";
+        const contactEmail = lead.contact?.email || "";
+        const contactPhone = lead.contact?.phone || "";
         const matchesSearch =
-          lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lead.phone.includes(searchQuery);
+          contactName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          contactEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          contactPhone.includes(searchQuery);
         return matchesSearch;
       })
       .map((lead) => ({
         id: lead.id,
-        name: lead.name,
+        name: lead.contact?.name || "Unknown",
         column: lead.status || "new",
         original: lead,
       }));
@@ -164,9 +167,9 @@ export function SellersKanban({ data: initialData }: SellersKanbanProps) {
                       <div className="flex items-center gap-2 min-w-0">
                         <Avatar className="size-8">
                           <AvatarFallback className="text-xs">
-                            {item.original.name
+                            {(item.original.contact?.name || "?")
                               .split(" ")
-                              .map((n) => n[0])
+                              .map((n: string) => n[0])
                               .join("")
                               .slice(0, 2)}
                           </AvatarFallback>
@@ -174,7 +177,7 @@ export function SellersKanban({ data: initialData }: SellersKanbanProps) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1">
                             <span className="font-medium text-sm block truncate">
-                              {item.original.name}
+                              {item.original.contact?.name || "Unknown"}
                             </span>
                             {item.original.isNri && (
                               <Globe className="size-3 text-blue-500 shrink-0" />
@@ -182,7 +185,7 @@ export function SellersKanban({ data: initialData }: SellersKanbanProps) {
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Phone className="size-3 shrink-0" />
-                            <span className="truncate">{item.original.phone}</span>
+                            <span className="truncate">{item.original.contact?.phone || ""}</span>
                           </div>
                         </div>
                       </div>

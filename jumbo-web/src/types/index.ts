@@ -4,8 +4,12 @@
 
 // Re-export database types
 export type {
+  TeamMember,
+  NewTeamMember,
   Profile,
   NewProfile,
+  Contact,
+  NewContact,
   Building,
   NewBuilding,
   Unit,
@@ -66,11 +70,11 @@ export type {
   OfferStatus,
 } from "@/lib/db/schema";
 
-import { Profile, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer, BuyerEvent } from "@/lib/db/schema";
+import { TeamMember, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer, BuyerEvent, Contact } from "@/lib/db/schema";
 
 export type LeadWithRelations = Lead & {
-  profile: Profile | null;
-  assignedAgent: Profile | null;
+  contact: Contact | null;
+  assignedAgent: TeamMember | null;
   notes?: Note[];
   buyerEvents?: BuyerEvent[];
   offers?: Offer[];
@@ -88,12 +92,12 @@ export type ListingWithRelations = Listing & {
 };
 
 export type SellerLeadWithRelations = SellerLead & {
-  profile: Profile | null;
+  contact: Contact | null;
   building: Building | null;
   unit: Unit | null;
-  assignedTo: Profile | null;
-  referredBy: Profile | null;
-  createdBy: Profile | null;
+  assignedTo: TeamMember | null;
+  referredBy: TeamMember | null;
+  createdBy: TeamMember | null;
   communications?: Communication[];
   tasks?: Task[];
   notes?: Note[];
@@ -101,7 +105,7 @@ export type SellerLeadWithRelations = SellerLead & {
 };
 
 export type AuditLogWithRelations = AuditLog & {
-  performedBy: Profile | null;
+  performedBy: TeamMember | null;
 };
 
 // Seller stats response

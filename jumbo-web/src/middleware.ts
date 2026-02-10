@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
-import type { UserRole } from "@/lib/db/schema";
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = ["/login", "/auth/callback"];
@@ -17,14 +16,6 @@ const DASHBOARD_ROUTES = [
   "/offers",
   "/settings",
 ];
-
-// Role-based route access configuration
-const ROLE_ACCESS: Record<string, UserRole[]> = {
-  "/settings/admin": ["super_admin"],
-  "/settings/team": ["super_admin", "team_lead"],
-  "/listings/new": ["super_admin", "listing_agent", "team_lead"],
-  "/sellers/new": ["super_admin", "seller_agent", "team_lead"],
-};
 
 function isProtectedRoute(pathname: string): boolean {
   // Root path is the dashboard, which is protected
@@ -75,32 +66,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Check role-based access for authenticated users
-  if (user && isProtected) {
-    // Find the most specific matching route for RBAC
-    const matchingRbacRoute = Object.keys(ROLE_ACCESS)
-      .filter((route) => pathname.startsWith(route))
-      .sort((a, b) => b.length - a.length)[0];
-
-    if (matchingRbacRoute) {
-      // Fetch user profile to get role
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-      const userRole = profile?.role as UserRole | undefined;
-      const allowedRoles = ROLE_ACCESS[matchingRbacRoute];
-
-      if (!userRole || !allowedRoles.includes(userRole)) {
-        // User doesn't have required role - redirect to dashboard with error
-        const dashboardUrl = new URL("/", request.url);
-        dashboardUrl.searchParams.set("error", "unauthorized");
-        return NextResponse.redirect(dashboardUrl);
-      }
-    }
-  }
+  // Note: Role-based page access is enforced at the server component level
+  // (see requireRole in lib/auth.ts) rather than in middleware, because
+  // middleware uses the Supabase anon key which is subject to RLS and cannot
+  // reliably query the team table. API-level permissions are enforced via
+  // withAuth + requirePermission in each route handler.
 
   return supabaseResponse;
 }

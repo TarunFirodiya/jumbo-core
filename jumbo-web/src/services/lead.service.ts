@@ -4,11 +4,12 @@
  */
 
 import { db } from "@/lib/db";
-import { leads, profiles, notes, type NewLead, type Lead } from "@/lib/db/schema";
+import { leads, notes, type NewLead, type Lead } from "@/lib/db/schema";
 import { eq, and, sql, desc, isNull, ne, gte } from "drizzle-orm";
 import type { LeadFilters, PaginatedResult } from "./types";
 import { NotFoundError } from "./errors";
-import * as profileService from "./profile.service";
+import * as contactService from "./contact.service";
+import * as teamService from "./team.service";
 
 /**
  * Create a new lead
@@ -19,10 +20,12 @@ export async function createLead(data: NewLead): Promise<Lead> {
 }
 
 /**
- * Create lead with profile creation if needed
+ * Create lead with contact creation if needed.
+ * This replaces the old createLeadWithProfile — now creates/finds a Contact
+ * instead of a Profile (team member).
  */
-export async function createLeadWithProfile(data: {
-  profile: {
+export async function createLeadWithContact(data: {
+  contact: {
     fullName: string;
     phone: string;
     email?: string;
@@ -31,7 +34,6 @@ export async function createLeadWithProfile(data: {
   source?: string;
   status?: "new" | "contacted" | "active_visitor" | "at_risk" | "closed";
   externalId?: string;
-  secondaryPhone?: string;
   sourceListingId?: string;
   dropReason?: string;
   locality?: string;
@@ -42,29 +44,26 @@ export async function createLeadWithProfile(data: {
   requirements?: Record<string, unknown>;
   preferences?: Record<string, unknown>;
   assignedAgentId?: string;
+  createdById?: string;
 }): Promise<Lead> {
-  // Check if profile exists by phone
-  let profile = await profileService.getProfileByPhone(data.profile.phone);
-
-  // Create profile if not exists
-  if (!profile) {
-    profile = await profileService.createProfile({
-      fullName: data.profile.fullName,
-      phone: data.profile.phone,
-      email: data.profile.email ?? null,
-    });
-  }
+  // Find or create contact by phone
+  const contact = await contactService.findOrCreateContactByPhone(
+    data.contact.phone,
+    {
+      name: data.contact.fullName,
+      email: data.contact.email,
+    }
+  );
 
   // Create lead
   const [lead] = await db
     .insert(leads)
     .values({
-      profileId: profile.id,
+      contactId: contact.id,
       leadId: data.leadId ?? null,
       source: data.source ?? null,
       status: data.status ?? "new",
       externalId: data.externalId ?? null,
-      secondaryPhone: data.secondaryPhone ?? null,
       sourceListingId: data.sourceListingId ?? null,
       dropReason: data.dropReason ?? null,
       locality: data.locality ?? null,
@@ -75,6 +74,7 @@ export async function createLeadWithProfile(data: {
       requirementJson: data.requirements ?? null,
       preferenceJson: data.preferences ?? null,
       assignedAgentId: data.assignedAgentId ?? null,
+      createdById: data.createdById ?? null,
     })
     .returning();
 
@@ -88,7 +88,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
   const result = await db.query.leads.findFirst({
     where: and(eq(leads.id, id), isNull(leads.deletedAt)),
     with: {
-      profile: true,
+      contact: true,
       assignedAgent: true,
     },
   });
@@ -102,7 +102,7 @@ export async function getLeadByIdWithRelations(id: string) {
   return db.query.leads.findFirst({
     where: and(eq(leads.id, id), isNull(leads.deletedAt)),
     with: {
-      profile: true,
+      contact: true,
       assignedAgent: true,
       communications: {
         orderBy: (comm, { desc }) => [desc(comm.createdAt)],
@@ -112,8 +112,6 @@ export async function getLeadByIdWithRelations(id: string) {
         orderBy: (visit, { desc }) => [desc(visit.createdAt)],
         limit: 10,
       },
-      // Notes are queried separately due to polymorphic relationship
-      // Use noteService.getNotesByEntity('buyer_lead', id) if needed
     },
   });
 }
@@ -151,9 +149,8 @@ export async function getLeads(
     db.query.leads.findMany({
       where: whereClause,
       with: {
-        profile: true,
+        contact: true,
         assignedAgent: true,
-        // Notes are queried separately due to polymorphic relationship
       },
       limit,
       offset,
@@ -187,7 +184,7 @@ export async function updateLeadStatus(id: string, status: string): Promise<Lead
     throw new NotFoundError("Lead", id);
   }
 
-  const updateData: Partial<NewLead> = { status };
+  const updateData: Partial<NewLead> = { status, updatedAt: new Date() };
 
   // Update lastContactedAt if status is "contacted"
   if (status === "contacted") {
@@ -214,7 +211,7 @@ export async function assignLead(leadId: string, agentId: string): Promise<Lead>
 
   const [updated] = await db
     .update(leads)
-    .set({ assignedAgentId: agentId })
+    .set({ assignedAgentId: agentId, updatedAt: new Date() })
     .where(eq(leads.id, leadId))
     .returning();
 
@@ -227,7 +224,7 @@ export async function assignLead(leadId: string, agentId: string): Promise<Lead>
  */
 export async function assignLeadRoundRobin(leadId: string): Promise<string | null> {
   // Get all active buyer agents
-  const agents = await profileService.getProfilesByRole("buyer_agent");
+  const agents = await teamService.getTeamMembersByRole("buyer_agent");
 
   if (agents.length === 0) {
     return null;
@@ -254,7 +251,7 @@ export async function assignLeadRoundRobin(leadId: string): Promise<string | nul
   if (assignedAgentId) {
     await db
       .update(leads)
-      .set({ assignedAgentId })
+      .set({ assignedAgentId, updatedAt: new Date() })
       .where(eq(leads.id, leadId));
   }
 
@@ -272,7 +269,7 @@ export async function updateLead(id: string, data: Partial<NewLead>): Promise<Le
 
   const [updated] = await db
     .update(leads)
-    .set(data)
+    .set({ ...data, updatedAt: new Date() })
     .where(eq(leads.id, id))
     .returning();
 
@@ -280,9 +277,10 @@ export async function updateLead(id: string, data: Partial<NewLead>): Promise<Le
 }
 
 /**
- * Update lead with profile data
+ * Update lead with contact data
+ * Updates both the lead and its associated contact.
  */
-export async function updateLeadWithProfile(
+export async function updateLeadWithContact(
   id: string,
   data: {
     status?: string;
@@ -298,7 +296,7 @@ export async function updateLeadWithProfile(
 ): Promise<Lead> {
   const lead = await db.query.leads.findFirst({
     where: eq(leads.id, id),
-    with: { profile: true },
+    with: { contact: true },
   });
 
   if (!lead) {
@@ -306,7 +304,7 @@ export async function updateLeadWithProfile(
   }
 
   // Update lead fields
-  const leadUpdates: Partial<NewLead> = {};
+  const leadUpdates: Partial<NewLead> = { updatedAt: new Date() };
   if (data.status) leadUpdates.status = data.status;
   if (data.assignedAgentId) leadUpdates.assignedAgentId = data.assignedAgentId;
 
@@ -326,14 +324,14 @@ export async function updateLeadWithProfile(
     };
   }
 
-  if (Object.keys(leadUpdates).length > 0) {
+  if (Object.keys(leadUpdates).length > 1) { // >1 because updatedAt is always set
     await db.update(leads).set(leadUpdates).where(eq(leads.id, id));
   }
 
-  // Update profile if provided
-  if (lead.profileId && (data.name || data.email || data.mobile)) {
-    await profileService.updateProfile(lead.profileId, {
-      ...(data.name && { fullName: data.name }),
+  // Update contact if provided
+  if (lead.contactId && (data.name || data.email || data.mobile)) {
+    await contactService.updateContact(lead.contactId, {
+      ...(data.name && { name: data.name }),
       ...(data.email && { email: data.email }),
       ...(data.mobile && { phone: data.mobile }),
     });
@@ -365,7 +363,7 @@ export async function deleteLead(id: string): Promise<void> {
 export async function updateLastContactedAt(id: string): Promise<void> {
   await db
     .update(leads)
-    .set({ lastContactedAt: new Date() })
+    .set({ lastContactedAt: new Date(), updatedAt: new Date() })
     .where(eq(leads.id, id));
 }
 
@@ -379,7 +377,7 @@ export async function findLeadByExternalId(
   const result = await db.query.leads.findFirst({
     where: and(eq(leads.externalId, externalId), eq(leads.source, source)),
     with: {
-      profile: true,
+      contact: true,
       assignedAgent: true,
     },
   });
@@ -400,7 +398,6 @@ export async function getLeadCountByAgent(agentId: string): Promise<number> {
 
 /**
  * Get buyer dashboard stats
- * Returns stats for the buyers page
  */
 export async function getBuyerStats(): Promise<{
   totalBuyers: number;
@@ -438,3 +435,12 @@ export async function getBuyerStats(): Promise<{
   };
 }
 
+// ============================================
+// BACKWARDS-COMPATIBLE ALIASES
+// ============================================
+
+/** @deprecated Use createLeadWithContact */
+export const createLeadWithProfile = createLeadWithContact;
+
+/** @deprecated Use updateLeadWithContact */
+export const updateLeadWithProfile = updateLeadWithContact;

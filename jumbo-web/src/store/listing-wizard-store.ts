@@ -106,15 +106,4 @@ export const availableAmenities = [
   "Senior Citizen Area",
 ];
 
-// Mock existing buildings for selection
-export const mockBuildings = [
-  { id: "b1", name: "Prestige Lakeside Habitat", locality: "Whitefield", city: "Bangalore" },
-  { id: "b2", name: "Brigade Gateway", locality: "Rajajinagar", city: "Bangalore" },
-  { id: "b3", name: "Sobha Dream Acres", locality: "Balagere", city: "Bangalore" },
-  { id: "b4", name: "Embassy Springs", locality: "Devanahalli", city: "Bangalore" },
-  { id: "b5", name: "Godrej Splendour", locality: "Whitefield", city: "Bangalore" },
-  { id: "b6", name: "Salarpuria Sattva", locality: "Electronic City", city: "Bangalore" },
-  { id: "b7", name: "Purva Westend", locality: "Kudlu Gate", city: "Bangalore" },
-  { id: "b8", name: "Total Environment", locality: "Yelahanka", city: "Bangalore" },
-];
 

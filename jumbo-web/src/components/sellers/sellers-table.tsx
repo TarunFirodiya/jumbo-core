@@ -43,7 +43,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 export const columns: ColumnDef<SellerLeadWithRelations>[] = [
   {
-    accessorKey: "name",
+    id: "contact.name",
     header: "Name",
     cell: ({ row }) => (
       <Link
@@ -51,7 +51,7 @@ export const columns: ColumnDef<SellerLeadWithRelations>[] = [
         className="font-medium truncate hover:underline block w-full"
       >
         <div className="flex items-center gap-2">
-          {row.getValue("name") || "Unknown"}
+          {row.original.contact?.name || "Unknown"}
           {row.original.isNri && (
             <Globe className="size-3 text-blue-500" />
           )}
@@ -95,11 +95,11 @@ export const columns: ColumnDef<SellerLeadWithRelations>[] = [
     },
   },
   {
-    accessorKey: "phone",
+    id: "contact.phone",
     header: "Phone",
     cell: ({ row }) => (
       <div className="text-muted-foreground tabular-nums">
-        {row.getValue("phone")}
+        {row.original.contact?.phone || "-"}
       </div>
     ),
   },
@@ -164,9 +164,9 @@ export function SellersTable({ data: initialData, pagination }: SellersTableProp
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (lead) =>
-          lead.name?.toLowerCase().includes(query) ||
-          lead.email?.toLowerCase().includes(query) ||
-          lead.phone?.includes(query)
+          lead.contact?.name?.toLowerCase().includes(query) ||
+          lead.contact?.email?.toLowerCase().includes(query) ||
+          lead.contact?.phone?.includes(query)
       );
     }
 
@@ -228,7 +228,7 @@ export function SellersTable({ data: initialData, pagination }: SellersTableProp
         </div>
       </div>
 
-      <DataTable columns={columns} data={filteredData} filterColumn="name" />
+      <DataTable columns={columns} data={filteredData} filterColumn="contact.name" />
     </div>
   );
 }

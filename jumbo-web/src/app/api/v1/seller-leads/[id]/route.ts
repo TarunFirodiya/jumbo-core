@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sellerLeads } from "@/lib/db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createClient } from "@/lib/supabase/server";
 import { logActivity, computeChanges } from "@/lib/audit";
 import { updateSellerLeadSchema } from "@/lib/validations/seller";
+import * as contactService from "@/services/contact.service";
 
 /**
  * GET /api/v1/seller-leads/[id]
@@ -17,17 +18,8 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-
-    // TEMPORARY BYPASS FOR DEBUGGING
-    // if (!user) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized", message: "Authentication required" },
-    //     { status: 401 }
-    //   );
-    // }
 
     const lead = await db.query.sellerLeads.findFirst({
       where: and(
@@ -35,7 +27,7 @@ export async function GET(
         sql`${sellerLeads.deletedAt} IS NULL`
       ),
       with: {
-        profile: true,
+        contact: true,
         building: true,
         unit: true,
         assignedTo: true,
@@ -80,16 +72,8 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-
-    // if (!user) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized", message: "Authentication required" },
-    //     { status: 401 }
-    //   );
-    // }
 
     // Get existing lead
     const existingLead = await db.query.sellerLeads.findFirst({
@@ -97,6 +81,9 @@ export async function PUT(
         eq(sellerLeads.id, id),
         sql`${sellerLeads.deletedAt} IS NULL`
       ),
+      with: {
+        contact: true,
+      },
     });
 
     if (!existingLead) {
@@ -109,16 +96,20 @@ export async function PUT(
     const body = await request.json();
     const validatedData = updateSellerLeadSchema.parse(body);
 
-    // Build update object
+    // Update contact info if provided (name, phone, email)
+    if (existingLead.contactId && (validatedData.name || validatedData.phone || validatedData.email)) {
+      await contactService.updateContact(existingLead.contactId, {
+        ...(validatedData.name && { name: validatedData.name }),
+        ...(validatedData.phone && { phone: validatedData.phone }),
+        ...(validatedData.email && { email: validatedData.email || null }),
+      });
+    }
+
+    // Build update object for seller lead fields only
     const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
-    if (validatedData.profileId !== undefined) updateData.profileId = validatedData.profileId;
-    if (validatedData.name !== undefined) updateData.name = validatedData.name;
-    if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
-    if (validatedData.email !== undefined) updateData.email = validatedData.email || null;
-    if (validatedData.secondaryPhone !== undefined) updateData.secondaryPhone = validatedData.secondaryPhone;
     if (validatedData.status !== undefined) updateData.status = validatedData.status;
     if (validatedData.source !== undefined) updateData.source = validatedData.source;
     if (validatedData.sourceUrl !== undefined) updateData.sourceUrl = validatedData.sourceUrl || null;
@@ -140,7 +131,7 @@ export async function PUT(
       .returning();
 
     // Log the update
-    const changes = computeChanges(existingLead as Record<string, unknown>, updatedLead as Record<string, unknown>);
+    const changes = computeChanges(existingLead as unknown as Record<string, unknown>, updatedLead as unknown as Record<string, unknown>);
     if (changes) {
       await logActivity({
         entityType: "seller_lead",
@@ -183,18 +174,9 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Verify authentication
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    // if (!user) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized", message: "Authentication required" },
-    //     { status: 401 }
-    //   );
-    // }
-
-    // Check if lead exists
     const existingLead = await db.query.sellerLeads.findFirst({
       where: and(
         eq(sellerLeads.id, id),
@@ -209,13 +191,11 @@ export async function DELETE(
       );
     }
 
-    // Soft delete
     await db
       .update(sellerLeads)
       .set({ deletedAt: new Date() })
       .where(eq(sellerLeads.id, id));
 
-    // Log the deletion
     await logActivity({
       entityType: "seller_lead",
       entityId: id,

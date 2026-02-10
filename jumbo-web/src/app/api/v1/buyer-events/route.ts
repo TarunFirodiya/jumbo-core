@@ -53,7 +53,7 @@ export const GET = withAuth(
           with: {
             lead: {
               with: {
-                profile: true,
+                contact: true,
               },
             },
             profile: true,
@@ -119,7 +119,7 @@ export const POST = withAuth<{ data: unknown; message: string } | { error: strin
         with: {
           lead: {
             with: {
-              profile: true,
+              contact: true,
             },
           },
           profile: true,

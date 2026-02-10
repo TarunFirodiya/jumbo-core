@@ -3,16 +3,20 @@
  * Centralized exports for all services
  *
  * Usage:
- * import * as leadService from "@/services/lead.service";
- * import { createLead } from "@/services/lead.service";
+ * import * as teamService from "@/services/team.service";
+ * import * as contactService from "@/services/contact.service";
  * import * as services from "@/services";
  */
 
 // Core Entity Services
 export * as buildingService from "./building.service";
 export * as unitService from "./unit.service";
-export * as profileService from "./profile.service";
+export * as teamService from "./team.service";
+export * as contactService from "./contact.service";
 export * as coinService from "./coin.service";
+
+// Backwards-compatible alias (use teamService in new code)
+export * as profileService from "./team.service";
 
 // CRM Services
 export * as leadService from "./lead.service";
@@ -40,4 +44,3 @@ export * from "./types";
 
 // Errors
 export * from "./errors";
-

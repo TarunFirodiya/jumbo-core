@@ -91,12 +91,17 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
   const [auditLogs, setAuditLogs] = React.useState<AuditLogWithRelations[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = React.useState(true);
 
+  // Contact info comes from the linked contact record
+  const contactName = (sellerLead as any)?.contact?.name || "";
+  const contactPhone = (sellerLead as any)?.contact?.phone || "";
+  const contactEmail = (sellerLead as any)?.contact?.email || "";
+
   const form = useForm<FormValues>({
     resolver: zodResolver(updateSellerLeadSchema),
     defaultValues: {
-      name: sellerLead?.name || "",
-      phone: sellerLead?.phone || "",
-      email: sellerLead?.email || "",
+      name: contactName,
+      phone: contactPhone,
+      email: contactEmail,
       status: sellerLead?.status || "new",
       source: sellerLead?.source,
       sourceUrl: sellerLead?.sourceUrl || "",
@@ -227,15 +232,15 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
         <div className="flex items-center gap-4 min-w-0 flex-1">
           <Avatar className="size-16 sm:size-20 border-4 border-background shadow-lg shrink-0">
             <AvatarFallback className="text-2xl sm:text-3xl font-bold">
-              {sellerLead.name
+              {(contactName || "?")
                 .split(" ")
-                .map((n) => n[0])
+                .map((n: string) => n[0])
                 .join("")
                 .slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold truncate">{sellerLead.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">{contactName || "Unknown"}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Last Contact: {lastContactText}
             </p>
@@ -249,7 +254,7 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
             className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-950"
           >
             <a
-              href={`https://wa.me/91${sellerLead.phone.replace(/\D/g, "")}`}
+              href={`https://wa.me/91${(contactPhone || "").replace(/\D/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -257,7 +262,7 @@ export function SellerDetailView({ sellerLead, id }: SellerDetailViewProps) {
             </a>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <a href={`tel:${sellerLead.phone}`}>
+            <a href={`tel:${contactPhone}`}>
               <Phone className="size-4 sm:size-5" />
             </a>
           </Button>

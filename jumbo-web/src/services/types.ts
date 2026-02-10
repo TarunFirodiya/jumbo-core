@@ -8,6 +8,7 @@ import type {
   Listing,
   Building,
   Unit,
+  TeamMember,
   Profile,
   SellerLead,
   Visit,
@@ -20,6 +21,7 @@ import type {
   Offer,
   CreditLedgerEntry,
   CreditRule,
+  Contact,
 } from "@/lib/db/schema";
 
 // ============================================
@@ -182,6 +184,7 @@ export type {
   Listing,
   Building,
   Unit,
+  TeamMember,
   Profile,
   SellerLead,
   Visit,
@@ -194,5 +197,5 @@ export type {
   Offer,
   CreditLedgerEntry,
   CreditRule,
+  Contact,
 };
-

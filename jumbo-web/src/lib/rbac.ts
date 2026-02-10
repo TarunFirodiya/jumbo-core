@@ -196,6 +196,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   listing_agent: [
     "leads:read",
     "seller_leads:read",
+    "seller_leads:create",
     "listings:read",
     "listings:create",
     "listings:update",

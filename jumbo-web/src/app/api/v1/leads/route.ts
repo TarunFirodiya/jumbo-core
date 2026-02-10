@@ -52,7 +52,6 @@ function verifyApiKey(request: NextRequest): boolean {
   const apiKey = request.headers.get("x-api-key");
   const expectedKey = process.env.LEADS_API_SECRET;
 
-  // If no secret is configured, reject all requests (secure by default)
   if (!expectedKey) {
     console.warn("LEADS_API_SECRET is not configured");
     return false;
@@ -64,7 +63,7 @@ function verifyApiKey(request: NextRequest): boolean {
 /**
  * POST /api/v1/leads
  * Create a new lead from external webhooks (e.g., Housing.com via Make.com)
- * Requires x-api-key header for authentication
+ * Creates/finds a Contact, then creates the lead referencing it.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -102,9 +101,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 3: Create lead with profile
-    const lead = await leadService.createLeadWithProfile({
-      profile: {
+    // Step 3: Create lead with contact
+    const lead = await leadService.createLeadWithContact({
+      contact: {
         fullName: validatedData.profile.fullName,
         phone: validatedData.profile.phone,
         email: validatedData.profile.email || undefined,
@@ -112,7 +111,6 @@ export async function POST(request: NextRequest) {
       leadId: validatedData.leadId,
       source: validatedData.source,
       externalId: validatedData.externalId || undefined,
-      secondaryPhone: validatedData.secondaryPhone || undefined,
       sourceListingId: validatedData.sourceListingId || undefined,
       dropReason: validatedData.dropReason || undefined,
       locality: validatedData.locality || undefined,

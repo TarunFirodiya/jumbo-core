@@ -51,7 +51,6 @@ export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
       fullName: "",
       phone: "",
       email: "",
-      secondaryPhone: "",
       source: "manual_entry",
       status: "new",
       assignedAgentId: null,
@@ -89,7 +88,6 @@ export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
         source: values.source,
         status: values.status,
         pipeline: false,
-        secondaryPhone: values.secondaryPhone || undefined,
         assignedAgentId: values.assignedAgentId || undefined,
       };
 
@@ -174,26 +172,6 @@ export function NewLeadForm({ onSuccess }: NewLeadFormProps) {
                     {...field}
                   />
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Secondary Phone */}
-        <FormField
-          control={form.control}
-          name="secondaryPhone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Secondary Phone</FormLabel>
-              <FormControl>
-                <PhoneInput
-                  defaultCountry="IN"
-                  placeholder="Enter secondary phone"
-                  value={field.value || ""}
-                  onChange={field.onChange}
-                />
               </FormControl>
               <FormMessage />
             </FormItem>

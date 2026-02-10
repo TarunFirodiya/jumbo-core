@@ -13,9 +13,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useListingWizardStore, mockBuildings } from "@/store/listing-wizard-store";
-import { Building2, Plus, Search, MapPin, Check } from "lucide-react";
+import { useListingWizardStore } from "@/store/listing-wizard-store";
+import { Building2, Plus, Search, MapPin, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface BuildingRecord {
+  id: string;
+  name: string;
+  locality: string | null;
+  city: string | null;
+}
 
 export function BuildingStep() {
   const building = useListingWizardStore((state) => state.building);
@@ -23,28 +30,45 @@ export function BuildingStep() {
 
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [buildings, setBuildings] = React.useState<BuildingRecord[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [newBuilding, setNewBuilding] = React.useState({
     name: "",
     locality: "",
     city: "Bangalore",
   });
 
-  const filteredBuildings = React.useMemo(() => {
-    if (!searchQuery) return mockBuildings;
-    const query = searchQuery.toLowerCase();
-    return mockBuildings.filter(
-      (b) =>
-        b.name.toLowerCase().includes(query) ||
-        b.locality.toLowerCase().includes(query)
-    );
+  // Fetch buildings from API
+  React.useEffect(() => {
+    async function fetchBuildings() {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams({ limit: "100" });
+        if (searchQuery) {
+          params.set("search", searchQuery);
+        }
+        const response = await fetch(`/api/v1/buildings?${params}`);
+        if (response.ok) {
+          const result = await response.json();
+          setBuildings(result.data || []);
+        }
+      } catch (error) {
+        console.error("Error fetching buildings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    const debounce = setTimeout(fetchBuildings, 300);
+    return () => clearTimeout(debounce);
   }, [searchQuery]);
 
-  const handleSelectBuilding = (b: typeof mockBuildings[0]) => {
+  const handleSelectBuilding = (b: BuildingRecord) => {
     setBuilding({
       id: b.id,
       name: b.name,
-      locality: b.locality,
-      city: b.city,
+      locality: b.locality || "",
+      city: b.city || "",
       isNew: false,
     });
   };
@@ -148,50 +172,59 @@ export function BuildingStep() {
         </Dialog>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
       {/* Building Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {filteredBuildings.map((b) => {
-          const isSelected = building?.id === b.id;
-          return (
-            <button
-              key={b.id}
-              onClick={() => handleSelectBuilding(b)}
-              className={cn(
-                "flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
-                "hover:border-primary/50 hover:bg-muted/50",
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : "border-muted bg-background"
-              )}
-            >
-              <div
+      {!isLoading && buildings.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {buildings.map((b) => {
+            const isSelected = building?.id === b.id;
+            return (
+              <button
+                key={b.id}
+                onClick={() => handleSelectBuilding(b)}
                 className={cn(
-                  "flex size-10 items-center justify-center rounded-lg shrink-0",
+                  "flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
+                  "hover:border-primary/50 hover:bg-muted/50",
                   isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    ? "border-primary bg-primary/5"
+                    : "border-muted bg-background"
                 )}
               >
-                <Building2 className="size-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-sm truncate">{b.name}</p>
-                  {isSelected && (
-                    <Check className="size-4 text-primary shrink-0" />
+                <div
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-lg shrink-0",
+                    isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
                   )}
+                >
+                  <Building2 className="size-5" />
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                  <MapPin className="size-3" />
-                  <span className="text-xs">
-                    {b.locality}, {b.city}
-                  </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">{b.name}</p>
+                    {isSelected && (
+                      <Check className="size-4 text-primary shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                    <MapPin className="size-3" />
+                    <span className="text-xs">
+                      {[b.locality, b.city].filter(Boolean).join(", ") || "No location"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Selected Building Display (if new) */}
       {building?.isNew && (
@@ -206,14 +239,22 @@ export function BuildingStep() {
         </div>
       )}
 
-      {filteredBuildings.length === 0 && (
+      {!isLoading && buildings.length === 0 && !building?.isNew && (
         <div className="text-center py-8 text-muted-foreground">
           <Building2 className="size-12 mx-auto mb-3 opacity-50" />
-          <p className="text-sm">No buildings found matching "{searchQuery}"</p>
-          <p className="text-xs mt-1">Try a different search or add a new building.</p>
+          {searchQuery ? (
+            <>
+              <p className="text-sm">No buildings found matching &ldquo;{searchQuery}&rdquo;</p>
+              <p className="text-xs mt-1">Try a different search or add a new building.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">No buildings yet</p>
+              <p className="text-xs mt-1">Click &ldquo;New Building&rdquo; to add your first building.</p>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
-

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { profiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { withAuth } from "@/lib/api-helpers";
 
 /**
  * GET /api/v1/profile
- * Get current user's profile
+ * Get current user's team member record
  */
 export const GET = withAuth(
   async (request: NextRequest, { user, profile }) => {
@@ -15,4 +12,3 @@ export const GET = withAuth(
     };
   }
 );
-

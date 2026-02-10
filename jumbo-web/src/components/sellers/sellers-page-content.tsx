@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/shared";
 import type { SellerLead } from "@/services/types";
 import type { SellerStats } from "@/types";
@@ -21,6 +22,12 @@ interface SellersPageContentProps {
 
 export function SellersPageContent({ data, pagination, stats }: SellersPageContentProps) {
   const [isNewSellerOpen, setIsNewSellerOpen] = useState(false);
+  const router = useRouter();
+
+  const handleNewSellerSuccess = () => {
+    setIsNewSellerOpen(false);
+    router.refresh();
+  };
 
   const newSellerAction = (
     <Dialog open={isNewSellerOpen} onOpenChange={setIsNewSellerOpen}>
@@ -37,7 +44,7 @@ export function SellersPageContent({ data, pagination, stats }: SellersPageConte
             Create a new seller lead to track through your pipeline.
           </DialogDescription>
         </DialogHeader>
-        <NewSellerForm onSuccess={() => setIsNewSellerOpen(false)} />
+        <NewSellerForm onSuccess={handleNewSellerSuccess} />
       </DialogContent>
     </Dialog>
   );

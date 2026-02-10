@@ -34,7 +34,7 @@ export async function GET(
         },
         lead: {
           with: {
-            profile: true,
+            contact: true,
             assignedAgent: true,
           },
         },
@@ -130,7 +130,7 @@ export async function PUT(
         listing: true,
         lead: {
           with: {
-            profile: true,
+            contact: true,
           },
         },
         createdBy: true,
@@ -235,7 +235,7 @@ export async function POST(
           listing: true,
           lead: {
             with: {
-              profile: true,
+              contact: true,
             },
           },
           createdBy: true,
@@ -267,7 +267,7 @@ export async function POST(
           listing: true,
           lead: {
             with: {
-              profile: true,
+              contact: true,
             },
           },
           createdBy: true,

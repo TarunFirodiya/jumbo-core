@@ -1,6 +1,10 @@
 import { ListingWizard } from "@/components/listings/wizard/listing-wizard";
+import { requireRole } from "@/lib/auth";
 
-export default function NewListingPage() {
+export default async function NewListingPage() {
+  // Only super_admin, listing_agent, and team_lead can create listings
+  await requireRole(["super_admin", "listing_agent", "team_lead"]);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Page Header */}

@@ -118,8 +118,8 @@ export function VisitForm({
           setBuyers(
             leadsData.map((lead: any) => ({
               id: lead.id,
-              name: lead.profile?.fullName ?? "Unknown",
-              phone: lead.profile?.phone ?? "",
+              name: lead.contact?.name ?? "Unknown",
+              phone: lead.contact?.phone ?? "",
               status: lead.status ?? "new",
             }))
           );

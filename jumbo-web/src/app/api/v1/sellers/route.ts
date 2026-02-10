@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { profiles } from "@/lib/db/schema";
+import { contacts } from "@/lib/db/schema";
 import { createSellerSchema } from "@/lib/validations/seller";
 import { eq, or, ilike, sql, and } from "drizzle-orm";
 import { withAuth } from "@/lib/api-helpers";
 
 /**
  * GET /api/v1/sellers
- * List sellers with filtering and pagination
+ * List seller contacts with filtering and pagination.
+ * Now queries the contacts table instead of profiles.
  */
 export const GET = withAuth(
   async (request: NextRequest) => {
     try {
-
       const searchParams = request.nextUrl.searchParams;
       const page = Number(searchParams.get("page")) || 1;
       const limit = Number(searchParams.get("limit")) || 20;
@@ -20,30 +20,27 @@ export const GET = withAuth(
 
       const offset = (page - 1) * limit;
 
-      // Build query conditions
       const conditions = [];
-    
+
       if (search) {
         conditions.push(
           or(
-            ilike(profiles.fullName, `%${search}%`),
-            ilike(profiles.email, `%${search}%`),
-            ilike(profiles.phone, `%${search}%`)
+            ilike(contacts.name, `%${search}%`),
+            ilike(contacts.email, `%${search}%`),
+            ilike(contacts.phone, `%${search}%`)
           )
         );
       }
-      
-      conditions.push(sql`${profiles.deletedAt} IS NULL`);
 
       const [data, countResult] = await Promise.all([
-        db.query.profiles.findMany({
+        db.query.contacts.findMany({
           where: conditions.length > 0 ? and(...conditions) : undefined,
           limit: limit,
           offset: offset,
         }),
         db
           .select({ count: sql<number>`count(*)` })
-          .from(profiles)
+          .from(contacts)
           .where(conditions.length > 0 ? and(...conditions) : undefined),
       ]);
 
@@ -68,42 +65,41 @@ export const GET = withAuth(
 
 /**
  * POST /api/v1/sellers
- * Create a new seller profile
+ * Create a new seller contact
  */
 export const POST = withAuth<{ data: unknown; message: string } | { error: string; message: string }>(
-  async (request: NextRequest, { user, profile }) => {
+  async (request: NextRequest) => {
     try {
-
       const body = await request.json();
       const validatedData = createSellerSchema.parse(body);
 
-      // Check if profile already exists
-      const existingProfile = await db.query.profiles.findFirst({
-        where: eq(profiles.phone, validatedData.phone),
+      // Check if contact already exists
+      const existingContact = await db.query.contacts.findFirst({
+        where: eq(contacts.phone, validatedData.phone),
       });
 
-      if (existingProfile) {
+      if (existingContact) {
         return NextResponse.json(
-          { error: "Conflict", message: "A profile with this phone number already exists" },
+          { error: "Conflict", message: "A contact with this phone number already exists" },
           { status: 409 }
         );
       }
 
-      // Create profile
-      const [newProfile] = await db
-        .insert(profiles)
+      // Create contact
+      const [newContact] = await db
+        .insert(contacts)
         .values({
-          fullName: validatedData.fullName,
+          name: validatedData.fullName,
           phone: validatedData.phone,
           email: validatedData.email || null,
-          role: "listing_agent",
+          type: "customer",
         })
         .returning();
 
       return NextResponse.json(
         {
-          data: newProfile,
-          message: "Seller profile created successfully",
+          data: newContact,
+          message: "Seller contact created successfully",
         },
         { status: 201 }
       );
@@ -122,4 +118,3 @@ export const POST = withAuth<{ data: unknown; message: string } | { error: strin
   },
   "sellers:create"
 );
-

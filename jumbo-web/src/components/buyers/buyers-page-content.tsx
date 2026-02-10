@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus } from "lucide-react";
 import type { LeadWithRelations } from "@/types";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/shared";
 
 interface BuyersPageContentProps {
@@ -28,6 +29,12 @@ interface BuyersPageContentProps {
 
 export function BuyersPageContent({ data, pagination, stats }: BuyersPageContentProps) {
   const [isNewLeadOpen, setIsNewLeadOpen] = useState(false);
+  const router = useRouter();
+
+  const handleNewLeadSuccess = () => {
+    setIsNewLeadOpen(false);
+    router.refresh();
+  };
 
   const newLeadAction = (
     <Dialog open={isNewLeadOpen} onOpenChange={setIsNewLeadOpen}>
@@ -44,7 +51,7 @@ export function BuyersPageContent({ data, pagination, stats }: BuyersPageContent
             Create a new lead manually.
           </DialogDescription>
         </DialogHeader>
-        <NewLeadForm onSuccess={() => setIsNewLeadOpen(false)} />
+        <NewLeadForm onSuccess={handleNewLeadSuccess} />
       </DialogContent>
     </Dialog>
   );

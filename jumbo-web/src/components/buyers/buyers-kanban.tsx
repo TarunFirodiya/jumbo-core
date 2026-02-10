@@ -73,7 +73,7 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
   const initialData: KanbanBuyer[] = useMemo(() => {
     return data
       .filter((lead) => {
-        const leadName = lead.profile?.fullName || "Unknown";
+        const leadName = lead.contact?.name || "Unknown";
         const location = (lead.requirementJson as any)?.localities?.join(", ") || "";
         
         const matchesSearch =
@@ -87,7 +87,7 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
       })
       .map((lead) => ({
         id: lead.id,
-        name: lead.profile?.fullName || "Unknown",
+        name: lead.contact?.name || "Unknown",
         column: lead.status || "new",
         original: lead,
       }));
@@ -238,7 +238,7 @@ export function BuyersKanban({ data }: BuyersKanbanProps) {
                             href={`/buyers/${lead.id}`}
                             className="font-medium text-sm block truncate hover:underline"
                           >
-                            {lead.profile?.fullName || "Unknown"}
+                            {lead.contact?.name || "Unknown"}
                           </Link>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <MapPin className="size-3 shrink-0" />

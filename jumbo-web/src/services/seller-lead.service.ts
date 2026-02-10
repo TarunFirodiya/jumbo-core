@@ -1,6 +1,7 @@
 /**
  * Seller Lead Service
- * Handles all database operations for seller leads
+ * Handles all database operations for seller leads.
+ * Identity (name/phone/email) now comes from the contacts table via contactId.
  */
 
 import { db } from "@/lib/db";
@@ -8,9 +9,65 @@ import { sellerLeads, listings, units, type NewSellerLead, type SellerLead } fro
 import { eq, and, sql, desc, isNull, gte } from "drizzle-orm";
 import type { SellerLeadFilters, PaginatedResult } from "./types";
 import { NotFoundError } from "./errors";
+import * as contactService from "./contact.service";
 
 /**
- * Create a new seller lead
+ * Create a new seller lead with contact creation.
+ * Finds or creates a contact by phone, then creates the seller lead.
+ */
+export async function createSellerLeadWithContact(data: {
+  contact: {
+    name: string;
+    phone: string;
+    email?: string;
+  };
+  source: "website" | "99acres" | "magicbricks" | "housing" | "nobroker" | "mygate" | "referral";
+  status?: "new" | "proposal_sent" | "proposal_accepted" | "dropped";
+  sourceUrl?: string;
+  sourceListingUrl?: string;
+  dropReason?: "not_interested" | "price_too_high" | "found_elsewhere" | "invalid_lead" | "duplicate" | "other";
+  referredById?: string;
+  buildingId?: string;
+  unitId?: string;
+  assignedToId?: string;
+  followUpDate?: Date;
+  isNri?: boolean;
+  createdById?: string;
+}): Promise<SellerLead> {
+  // Find or create contact
+  const contact = await contactService.findOrCreateContactByPhone(
+    data.contact.phone,
+    {
+      name: data.contact.name,
+      email: data.contact.email,
+    }
+  );
+
+  // Create seller lead
+  const [sellerLead] = await db
+    .insert(sellerLeads)
+    .values({
+      contactId: contact.id,
+      source: data.source,
+      status: data.status ?? "new",
+      sourceUrl: data.sourceUrl ?? null,
+      sourceListingUrl: data.sourceListingUrl ?? null,
+      dropReason: data.dropReason ?? null,
+      referredById: data.referredById ?? null,
+      buildingId: data.buildingId ?? null,
+      unitId: data.unitId ?? null,
+      assignedToId: data.assignedToId ?? null,
+      followUpDate: data.followUpDate ?? null,
+      isNri: data.isNri ?? false,
+      createdById: data.createdById ?? null,
+    })
+    .returning();
+
+  return sellerLead;
+}
+
+/**
+ * Create a new seller lead (low-level, expects contactId already resolved)
  */
 export async function createSellerLead(data: NewSellerLead): Promise<SellerLead> {
   const [sellerLead] = await db.insert(sellerLeads).values(data).returning();
@@ -24,6 +81,7 @@ export async function getSellerLeadById(id: string): Promise<SellerLead | null> 
   const result = await db.query.sellerLeads.findFirst({
     where: and(eq(sellerLeads.id, id), isNull(sellerLeads.deletedAt)),
     with: {
+      contact: true,
       assignedTo: true,
       referredBy: true,
       building: true,
@@ -67,6 +125,7 @@ export async function getSellerLeads(
     db.query.sellerLeads.findMany({
       where: whereClause,
       with: {
+        contact: true,
         assignedTo: true,
         referredBy: true,
         building: true,
@@ -177,6 +236,7 @@ export async function getSellerLeadsByBuilding(buildingId: string): Promise<Sell
   return db.query.sellerLeads.findMany({
     where: and(eq(sellerLeads.buildingId, buildingId), isNull(sellerLeads.deletedAt)),
     with: {
+      contact: true,
       assignedTo: true,
       unit: true,
     },
@@ -227,8 +287,7 @@ export async function getSellerLeadStats(): Promise<{
 }
 
 /**
- * Get seller dashboard stats (matches API /api/v1/sellers/stats)
- * Returns stats for the dashboard view
+ * Get seller dashboard stats
  */
 export async function getSellerDashboardStats(): Promise<{
   newLeads: number;
@@ -236,7 +295,6 @@ export async function getSellerDashboardStats(): Promise<{
   inspectionPending: number;
   activeSellers: number;
 }> {
-  // Get start of current month
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -246,7 +304,6 @@ export async function getSellerDashboardStats(): Promise<{
     inspectionPendingResult,
     activeSellersResult,
   ] = await Promise.all([
-    // 1. New Leads (this month) - seller_leads created this month
     db
       .select({ count: sql<number>`count(*)` })
       .from(sellerLeads)
@@ -256,8 +313,6 @@ export async function getSellerDashboardStats(): Promise<{
           isNull(sellerLeads.deletedAt)
         )
       ),
-
-    // 2. Homes Live (this month) - listings with published_at in current month
     db
       .select({ count: sql<number>`count(*)` })
       .from(listings)
@@ -267,8 +322,6 @@ export async function getSellerDashboardStats(): Promise<{
           isNull(listings.deletedAt)
         )
       ),
-
-    // 3. Schedule Inspections - listings with inspection_pending status
     db
       .select({ count: sql<number>`count(*)` })
       .from(listings)
@@ -278,8 +331,6 @@ export async function getSellerDashboardStats(): Promise<{
           isNull(listings.deletedAt)
         )
       ),
-
-    // 4. Active Sellers - distinct owners of units that have active listings
     db
       .select({ count: sql<number>`count(DISTINCT ${units.ownerId})` })
       .from(listings)
@@ -299,4 +350,3 @@ export async function getSellerDashboardStats(): Promise<{
     activeSellers: Number(activeSellersResult[0]?.count ?? 0),
   };
 }
-

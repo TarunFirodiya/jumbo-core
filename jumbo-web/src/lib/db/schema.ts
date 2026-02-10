@@ -51,7 +51,6 @@ export const auditActionEnum = pgEnum("audit_action", [
   "delete",
 ]);
 
-// New enums for schema migration
 export const dropReasonEnum = pgEnum("drop_reason", [
   "not_interested",
   "price_too_high",
@@ -211,15 +210,19 @@ export const contacts = pgTable("contacts", {
   email: text("email"),
   type: contactTypeEnum("type").default("customer"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdById: uuid("created_by_id"),
+  updatedById: uuid("updated_by_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ============================================
-// 1. USER & AGENT MANAGEMENT
+// 1. TEAM (Internal Users / Agents)
+//    Renamed from "profiles" — this table is for
+//    internal team members only (agents, admins, etc.)
 // ============================================
 
-export const profiles = pgTable("profiles", {
+export const team = pgTable("team", {
   id: uuid("id").primaryKey().defaultRandom(),
   fullName: text("full_name").notNull(),
   phone: text("phone").unique().notNull(),
@@ -229,9 +232,28 @@ export const profiles = pgTable("profiles", {
   territoryId: text("territory_id"),
   totalCoins: integer("total_coins").default(0),
   contactId: uuid("contact_id").references((): any => contacts.id),
-  createdById: uuid("created_by_id").references((): any => profiles.id),
+  createdById: uuid("created_by_id").references((): any => team.id),
+  updatedById: uuid("updated_by_id").references((): any => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+// ============================================
+// 1b. TEAM ROLE HISTORY (Track role changes)
+// ============================================
+
+export const teamRoleHistory = pgTable("team_role_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teamMemberId: uuid("team_member_id")
+    .references(() => team.id)
+    .notNull(),
+  role: userRoleEnum("role").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  changedById: uuid("changed_by_id").references(() => team.id),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 // ============================================
@@ -262,8 +284,10 @@ export const buildings = pgTable("buildings", {
   gtmHousingName: text("gtm_housing_name"),
   gtmHousingId: text("gtm_housing_id"),
   mediaJson: jsonb("media_json").$type<Record<string, string[]>>(),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
@@ -286,15 +310,18 @@ export const units = pgTable("units", {
   lpgConnection: boolean("lpg_connection").default(false),
   keysPhone: text("keys_phone"),
   keysWith: text("keys_with"),
-  ownerId: uuid("owner_id").references(() => profiles.id),
+  ownerId: uuid("owner_id").references(() => team.id),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const listings = pgTable("listings", {
   id: uuid("id").primaryKey().defaultRandom(),
   unitId: uuid("unit_id").references(() => units.id),
-  listingAgentId: uuid("listing_agent_id").references(() => profiles.id),
+  listingAgentId: uuid("listing_agent_id").references(() => team.id),
   jumboId: text("jumbo_id"),
   hid: text("hid"),
   listingSlug: text("listing_slug"),
@@ -313,7 +340,7 @@ export const listings = pgTable("listings", {
   propertyType: propertyTypeEnum("property_type"),
   occupancy: occupancyEnum("occupancy"),
   furnishing: furnishingEnum("furnishing"),
-  zoneLeadId: uuid("zone_lead_id").references(() => profiles.id),
+  zoneLeadId: uuid("zone_lead_id").references(() => team.id),
   onHold: boolean("on_hold").default(false),
   sold: boolean("sold").default(false),
   soldBy: soldByEnum("sold_by"),
@@ -337,9 +364,9 @@ export const listings = pgTable("listings", {
   photoshootAvailability2: timestamp("photoshoot_availability_2", { withTimezone: true }),
   photoshootAvailability3: timestamp("photoshoot_availability_3", { withTimezone: true }),
   photoshootRtmi: boolean("photoshoot_rtmi").default(false),
-  photoshootAssignedToId: uuid("photoshoot_assigned_to_id").references(() => profiles.id),
+  photoshootAssignedToId: uuid("photoshoot_assigned_to_id").references(() => team.id),
   offboardingDatetime: timestamp("offboarding_datetime", { withTimezone: true }),
-  offboardingDelistedById: uuid("offboarding_delisted_by_id").references(() => profiles.id),
+  offboardingDelistedById: uuid("offboarding_delisted_by_id").references(() => team.id),
   spotlight: boolean("spotlight").default(false),
   priority: priorityEnum("priority"),
   builderUnit: boolean("builder_unit").default(false),
@@ -354,6 +381,8 @@ export const listings = pgTable("listings", {
   }>(),
   isVerified: boolean("is_verified").default(false),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -361,17 +390,19 @@ export const listings = pgTable("listings", {
 
 // ============================================
 // 3. CRM & LEAD MANAGEMENT (Buyer Leads)
+//    Identity comes from contacts via contactId.
+//    No phone/email/name/secondaryPhone on this table.
 // ============================================
 
 export const leads = pgTable("leads", {
   id: uuid("id").primaryKey().defaultRandom(),
-  profileId: uuid("profile_id").references(() => profiles.id),
+  contactId: uuid("contact_id")
+    .references(() => contacts.id)
+    .notNull(),
   leadId: text("lead_id"),
   source: text("source"),
-  externalId: text("external_id"), // ID from Housing.com, MagicBricks, etc.
-  secondaryPhone: text("secondary_phone"),
+  externalId: text("external_id"),
   sourceListingId: text("source_listing_id"),
-  contactId: uuid("contact_id").references(() => contacts.id), // Migration: Link to Identity
   dropReason: text("drop_reason"),
   locality: text("locality"),
   zone: text("zone"),
@@ -379,7 +410,7 @@ export const leads = pgTable("leads", {
   referredBy: text("referred_by"),
   testListingId: text("test_listing_id"),
   status: text("status").default("new"),
-  assignedAgentId: uuid("assigned_agent_id").references(() => profiles.id),
+  assignedAgentId: uuid("assigned_agent_id").references(() => team.id),
   requirementJson: jsonb("requirement_json").$type<{
     bhk?: number[];
     budget_min?: number;
@@ -399,34 +430,37 @@ export const leads = pgTable("leads", {
     preferred_buildings?: string[];
   }>(),
   lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 // ============================================
 // 3b. CRM & LEAD MANAGEMENT (Seller Leads)
+//     Identity comes from contacts via contactId.
+//     No name/phone/email/secondaryPhone on this table.
 // ============================================
 
 export const sellerLeads = pgTable("seller_leads", {
   id: uuid("id").primaryKey().defaultRandom(),
-  profileId: uuid("profile_id").references(() => profiles.id),
-  name: text("name").notNull(),
-  phone: text("phone").notNull(),
-  email: text("email"),
-  secondaryPhone: text("secondary_phone"),
+  contactId: uuid("contact_id")
+    .references(() => contacts.id)
+    .notNull(),
   status: sellerLeadStatusEnum("status").default("new"),
   source: sellerLeadSourceEnum("source").notNull(),
   sourceUrl: text("source_url"),
   sourceListingUrl: text("source_listing_url"),
-  contactId: uuid("contact_id").references(() => contacts.id), // Migration: Link to Identity
   dropReason: dropReasonEnum("drop_reason"),
-  referredById: uuid("referred_by_id").references(() => profiles.id),
+  referredById: uuid("referred_by_id").references(() => team.id),
   buildingId: uuid("building_id").references(() => buildings.id),
   unitId: uuid("unit_id").references(() => units.id),
-  assignedToId: uuid("assigned_to_id").references(() => profiles.id),
+  assignedToId: uuid("assigned_to_id").references(() => team.id),
   followUpDate: timestamp("follow_up_date", { withTimezone: true }),
   isNri: boolean("is_nri").default(false),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -442,7 +476,7 @@ export const communications = pgTable("communications", {
   sellerLeadId: uuid("seller_lead_id").references(() => sellerLeads.id),
   listingId: uuid("listing_id").references(() => listings.id),
   visitId: uuid("visit_id").references(() => visits.id),
-  agentId: uuid("agent_id").references(() => profiles.id),
+  agentId: uuid("agent_id").references(() => team.id),
   channel: text("channel"),
   direction: text("direction"),
   content: text("content"),
@@ -460,14 +494,17 @@ export const communications = pgTable("communications", {
 
 export const visitTours = pgTable("visit_tours", {
   id: uuid("id").primaryKey().defaultRandom(),
-  dispatchAgentId: uuid("dispatch_agent_id").references(() => profiles.id),
-  fieldAgentId: uuid("field_agent_id").references(() => profiles.id),
+  dispatchAgentId: uuid("dispatch_agent_id").references(() => team.id),
+  fieldAgentId: uuid("field_agent_id").references(() => team.id),
   tourDate: date("tour_date"),
   optimizedRoute: jsonb("optimized_route").$type<{
     waypoints?: Array<{ lat: number; lng: number; listing_id: string }>;
   }>(),
   status: text("status").default("planned"),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
@@ -500,8 +537,8 @@ export const visits = pgTable("visits", {
   rescheduleTime: timestamp("reschedule_time", { withTimezone: true }),
   rescheduleRequested: boolean("reschedule_requested").default(false),
   rescheduledFromVisitId: uuid("rescheduled_from_visit_id").references((): any => visits.id),
-  assignedVaId: uuid("assigned_va_id").references(() => profiles.id),
-  completedById: uuid("completed_by_id").references(() => profiles.id),
+  assignedVaId: uuid("assigned_va_id").references(() => team.id),
+  completedById: uuid("completed_by_id").references(() => team.id),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   status: text("status").default("pending"),
   feedbackText: text("feedback_text"),
@@ -510,7 +547,10 @@ export const visits = pgTable("visits", {
   bsaBool: boolean("bsa_bool").default(false),
   agentLatitude: real("agent_latitude"),
   agentLongitude: real("agent_longitude"),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 // ============================================
@@ -519,8 +559,8 @@ export const visits = pgTable("visits", {
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
-  creatorId: uuid("creator_id").references(() => profiles.id),
-  assigneeId: uuid("assignee_id").references(() => profiles.id),
+  creatorId: uuid("creator_id").references(() => team.id),
+  assigneeId: uuid("assignee_id").references(() => team.id),
   title: text("title").notNull(),
   description: text("description"),
   priority: text("priority").default("medium"),
@@ -528,7 +568,9 @@ export const tasks = pgTable("tasks", {
   relatedLeadId: uuid("related_lead_id").references(() => leads.id),
   sellerLeadId: uuid("seller_lead_id").references(() => sellerLeads.id),
   status: text("status").default("open"),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
@@ -545,7 +587,7 @@ export const creditRules = pgTable("credit_rules", {
 
 export const creditLedger = pgTable("credit_ledger", {
   id: uuid("id").primaryKey().defaultRandom(),
-  agentId: uuid("agent_id").references(() => profiles.id),
+  agentId: uuid("agent_id").references(() => team.id),
   amount: integer("amount").notNull(),
   actionType: text("action_type"),
   referenceId: uuid("reference_id"),
@@ -559,11 +601,11 @@ export const creditLedger = pgTable("credit_ledger", {
 
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  entityType: text("entity_type").notNull(), // seller_lead, listing, visit, lead, etc.
+  entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
   action: auditActionEnum("action").notNull(),
   changes: jsonb("changes").$type<Record<string, { old: unknown; new: unknown }>>(),
-  performedById: uuid("performed_by_id").references(() => profiles.id),
+  performedById: uuid("performed_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
@@ -573,11 +615,13 @@ export const auditLogs = pgTable("audit_logs", {
 
 export const notes = pgTable("notes", {
   id: uuid("id").primaryKey().defaultRandom(),
-  entityType: text("entity_type").notNull(), // 'seller_lead', 'buyer_lead', 'listing', 'visit', 'building', 'unit'
+  entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
   content: text("content").notNull(),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
@@ -587,10 +631,10 @@ export const notes = pgTable("notes", {
 
 export const mediaItems = pgTable("media_items", {
   id: uuid("id").primaryKey().defaultRandom(),
-  entityType: text("entity_type").notNull(), // 'listing', 'building', 'home_inspection', 'home_catalogue'
+  entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
   mediaType: mediaTypeEnum("media_type").notNull(),
-  tag: text("tag"), // 'living_room', 'kitchen', 'bedroom_1', 'facade', etc.
+  tag: text("tag"),
   cloudinaryUrl: text("cloudinary_url").notNull(),
   cloudinaryPublicId: text("cloudinary_public_id"),
   order: integer("order").default(0),
@@ -601,8 +645,10 @@ export const mediaItems = pgTable("media_items", {
     format?: string;
     [key: string]: unknown;
   }>(),
-  uploadedById: uuid("uploaded_by_id").references(() => profiles.id),
+  uploadedById: uuid("uploaded_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
@@ -616,7 +662,7 @@ export const homeInspections = pgTable("home_inspections", {
   name: text("name"),
   location: text("location"),
   inspectedOn: timestamp("inspected_on", { withTimezone: true }),
-  inspectedById: uuid("inspected_by_id").references(() => profiles.id),
+  inspectedById: uuid("inspected_by_id").references(() => team.id),
   inspectionLatitude: real("inspection_latitude"),
   inspectionLongitude: real("inspection_longitude"),
   inspectionScore: numeric("inspection_score"),
@@ -629,6 +675,8 @@ export const homeInspections = pgTable("home_inspections", {
   videoLink: text("video_link"),
   thumbnailUrl: text("thumbnail_url"),
   status: inspectionStatusEnum("status").default("pending"),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -643,7 +691,7 @@ export const homeCatalogues = pgTable("home_catalogues", {
   inspectionId: uuid("inspection_id").references(() => homeInspections.id),
   name: text("name"),
   inspectedOn: timestamp("inspected_on", { withTimezone: true }),
-  cataloguedById: uuid("catalogued_by_id").references(() => profiles.id),
+  cataloguedById: uuid("catalogued_by_id").references(() => team.id),
   cataloguingScore: numeric("cataloguing_score"),
   cauveryChecklist: boolean("cauvery_checklist").default(false),
   thumbnailUrl: text("thumbnail_url"),
@@ -653,6 +701,8 @@ export const homeCatalogues = pgTable("home_catalogues", {
   video30SecUrl: text("video_30sec_url"),
   status: catalogueStatusEnum("status").default("pending"),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
@@ -664,13 +714,13 @@ export const homeCatalogues = pgTable("home_catalogues", {
 export const buyerEvents = pgTable("buyer_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   leadId: uuid("lead_id").references(() => leads.id),
-  profileId: uuid("profile_id").references(() => profiles.id),
+  profileId: uuid("profile_id").references(() => team.id),
   phone: text("phone"),
   leadSource: text("lead_source"),
   sourceListingId: text("source_listing_id"),
-  eventType: text("event_type"), // 'lead_created', 'listing_viewed', 'contact_made', etc.
+  eventType: text("event_type"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdById: uuid("created_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
@@ -685,7 +735,8 @@ export const offers = pgTable("offers", {
   offerAmount: numeric("offer_amount").notNull(),
   status: offerStatusEnum("status").default("pending"),
   terms: jsonb("terms").$type<Record<string, unknown>>(),
-  createdById: uuid("created_by_id").references(() => profiles.id),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -695,11 +746,16 @@ export const offers = pgTable("offers", {
 // RELATIONS
 // ============================================
 
-export const profilesRelations = relations(profiles, ({ many, one }) => ({
+export const contactsRelations = relations(contacts, ({ many }) => ({
+  teamMembers: many(team),
+  leads: many(leads),
+  sellerLeads: many(sellerLeads),
+}));
+
+export const teamRelations = relations(team, ({ many, one }) => ({
   ownedUnits: many(units, { relationName: "unitOwner" }),
   createdListings: many(listings, { relationName: "listingAgent" }),
   assignedLeads: many(leads, { relationName: "assignedAgent" }),
-  buyerLeads: many(leads, { relationName: "buyerProfile" }),
   assignedSellerLeads: many(sellerLeads, { relationName: "assignedAgent" }),
   referredSellerLeads: many(sellerLeads, { relationName: "referredBy" }),
   createdSellerLeads: many(sellerLeads, { relationName: "createdBy" }),
@@ -710,8 +766,6 @@ export const profilesRelations = relations(profiles, ({ many, one }) => ({
   assignedTasks: many(tasks, { relationName: "taskAssignee" }),
   creditEntries: many(creditLedger),
   auditLogs: many(auditLogs),
-  // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query notes separately using entityType and entityId
   mediaItems: many(mediaItems, { relationName: "uploadedBy" }),
   homeInspections: many(homeInspections),
   homeCatalogues: many(homeCatalogues),
@@ -722,25 +776,36 @@ export const profilesRelations = relations(profiles, ({ many, one }) => ({
   offboardingDelistings: many(listings, { relationName: "offboardingDelistedBy" }),
   assignedVisits: many(visits, { relationName: "assignedVa" }),
   completedVisits: many(visits, { relationName: "completedBy" }),
+  roleHistory: many(teamRoleHistory),
   contact: one(contacts, {
-    fields: [profiles.contactId],
+    fields: [team.contactId],
     references: [contacts.id],
   }),
-  createdBy: one(profiles, {
-    fields: [profiles.createdById],
-    references: [profiles.id],
-    relationName: "createdByProfile",
+  createdBy: one(team, {
+    fields: [team.createdById],
+    references: [team.id],
+    relationName: "createdByTeamMember",
+  }),
+}));
+
+export const teamRoleHistoryRelations = relations(teamRoleHistory, ({ one }) => ({
+  teamMember: one(team, {
+    fields: [teamRoleHistory.teamMemberId],
+    references: [team.id],
+  }),
+  changedBy: one(team, {
+    fields: [teamRoleHistory.changedById],
+    references: [team.id],
+    relationName: "roleChangedBy",
   }),
 }));
 
 export const buildingsRelations = relations(buildings, ({ many, one }) => ({
   units: many(units),
   sellerLeads: many(sellerLeads),
-  // MediaItems use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query mediaItems separately using entityType='building' and entityId=building.id
-  createdBy: one(profiles, {
+  createdBy: one(team, {
     fields: [buildings.createdById],
-    references: [profiles.id],
+    references: [team.id],
   }),
 }));
 
@@ -749,9 +814,9 @@ export const unitsRelations = relations(units, ({ one, many }) => ({
     fields: [units.buildingId],
     references: [buildings.id],
   }),
-  owner: one(profiles, {
+  owner: one(team, {
     fields: [units.ownerId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "unitOwner",
   }),
   listings: many(listings),
@@ -763,31 +828,27 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
     fields: [listings.unitId],
     references: [units.id],
   }),
-  listingAgent: one(profiles, {
+  listingAgent: one(team, {
     fields: [listings.listingAgentId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "listingAgent",
   }),
-  zoneLead: one(profiles, {
+  zoneLead: one(team, {
     fields: [listings.zoneLeadId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "zoneLead",
   }),
-  photoshootAssignedTo: one(profiles, {
+  photoshootAssignedTo: one(team, {
     fields: [listings.photoshootAssignedToId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "photoshootAssignedTo",
   }),
-  offboardingDelistedBy: one(profiles, {
+  offboardingDelistedBy: one(team, {
     fields: [listings.offboardingDelistedById],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "offboardingDelistedBy",
   }),
   visits: many(visits),
-  // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query notes separately using entityType='listing' and entityId=listing.id
-  // MediaItems also use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query mediaItems separately using entityType='listing' and entityId=listing.id
   homeInspections: many(homeInspections),
   homeCatalogues: many(homeCatalogues),
   offers: many(offers),
@@ -795,27 +856,57 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
 }));
 
 export const leadsRelations = relations(leads, ({ one, many }) => ({
-  profile: one(profiles, {
-    fields: [leads.profileId],
-    references: [profiles.id],
-    relationName: "buyerProfile",
-  }),
-  assignedAgent: one(profiles, {
-    fields: [leads.assignedAgentId],
-    references: [profiles.id],
-    relationName: "assignedAgent",
-  }),
-  communications: many(communications),
-  visits: many(visits),
-  tasks: many(tasks),
-  // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query notes separately using entityType='buyer_lead' and entityId=lead.id
-  buyerEvents: many(buyerEvents),
-  offers: many(offers),
   contact: one(contacts, {
     fields: [leads.contactId],
     references: [contacts.id],
   }),
+  assignedAgent: one(team, {
+    fields: [leads.assignedAgentId],
+    references: [team.id],
+    relationName: "assignedAgent",
+  }),
+  createdBy: one(team, {
+    fields: [leads.createdById],
+    references: [team.id],
+    relationName: "leadCreatedBy",
+  }),
+  communications: many(communications),
+  visits: many(visits),
+  tasks: many(tasks),
+  buyerEvents: many(buyerEvents),
+  offers: many(offers),
+}));
+
+export const sellerLeadsRelations = relations(sellerLeads, ({ one, many }) => ({
+  contact: one(contacts, {
+    fields: [sellerLeads.contactId],
+    references: [contacts.id],
+  }),
+  referredBy: one(team, {
+    fields: [sellerLeads.referredById],
+    references: [team.id],
+    relationName: "referredBy",
+  }),
+  building: one(buildings, {
+    fields: [sellerLeads.buildingId],
+    references: [buildings.id],
+  }),
+  unit: one(units, {
+    fields: [sellerLeads.unitId],
+    references: [units.id],
+  }),
+  assignedTo: one(team, {
+    fields: [sellerLeads.assignedToId],
+    references: [team.id],
+    relationName: "assignedAgent",
+  }),
+  createdBy: one(team, {
+    fields: [sellerLeads.createdById],
+    references: [team.id],
+    relationName: "createdBy",
+  }),
+  communications: many(communications),
+  tasks: many(tasks),
 }));
 
 export const communicationsRelations = relations(communications, ({ one }) => ({
@@ -835,21 +926,21 @@ export const communicationsRelations = relations(communications, ({ one }) => ({
     fields: [communications.visitId],
     references: [visits.id],
   }),
-  agent: one(profiles, {
+  agent: one(team, {
     fields: [communications.agentId],
-    references: [profiles.id],
+    references: [team.id],
   }),
 }));
 
 export const visitToursRelations = relations(visitTours, ({ one, many }) => ({
-  dispatchAgent: one(profiles, {
+  dispatchAgent: one(team, {
     fields: [visitTours.dispatchAgentId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "dispatchAgent",
   }),
-  fieldAgent: one(profiles, {
+  fieldAgent: one(team, {
     fields: [visitTours.fieldAgentId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "fieldAgent",
   }),
   visits: many(visits),
@@ -873,30 +964,28 @@ export const visitsRelations = relations(visits, ({ one, many }) => ({
     references: [visits.id],
     relationName: "rescheduledFrom",
   }),
-  assignedVa: one(profiles, {
+  assignedVa: one(team, {
     fields: [visits.assignedVaId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "assignedVa",
   }),
-  completedBy: one(profiles, {
+  completedBy: one(team, {
     fields: [visits.completedById],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "completedBy",
   }),
-  // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query notes separately using entityType='visit' and entityId=visit.id
   communications: many(communications),
 }));
 
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  creator: one(profiles, {
+  creator: one(team, {
     fields: [tasks.creatorId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "taskCreator",
   }),
-  assignee: one(profiles, {
+  assignee: one(team, {
     fields: [tasks.assigneeId],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "taskAssignee",
   }),
   relatedLead: one(leads, {
@@ -910,79 +999,30 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
 }));
 
 export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
-  agent: one(profiles, {
+  agent: one(team, {
     fields: [creditLedger.agentId],
-    references: [profiles.id],
-  }),
-}));
-
-export const sellerLeadsRelations = relations(sellerLeads, ({ one, many }) => ({
-  profile: one(profiles, {
-    fields: [sellerLeads.profileId],
-    references: [profiles.id],
-    relationName: "sellerProfile",
-  }),
-  referredBy: one(profiles, {
-    fields: [sellerLeads.referredById],
-    references: [profiles.id],
-    relationName: "referredBy",
-  }),
-  building: one(buildings, {
-    fields: [sellerLeads.buildingId],
-    references: [buildings.id],
-  }),
-  unit: one(units, {
-    fields: [sellerLeads.unitId],
-    references: [units.id],
-  }),
-  assignedTo: one(profiles, {
-    fields: [sellerLeads.assignedToId],
-    references: [profiles.id],
-    relationName: "assignedAgent",
-  }),
-  createdBy: one(profiles, {
-    fields: [sellerLeads.createdById],
-    references: [profiles.id],
-    relationName: "createdBy",
-  }),
-  communications: many(communications),
-  tasks: many(tasks),
-  // Notes use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query notes separately using entityType='seller_lead' and entityId=sellerLead.id
-  contact: one(contacts, {
-    fields: [sellerLeads.contactId],
-    references: [contacts.id],
+    references: [team.id],
   }),
 }));
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
-  performedBy: one(profiles, {
+  performedBy: one(team, {
     fields: [auditLogs.performedById],
-    references: [profiles.id],
+    references: [team.id],
   }),
 }));
 
-export const contactsRelations = relations(contacts, ({ many }) => ({
-  profiles: many(profiles),
-  leads: many(leads),
-  sellerLeads: many(sellerLeads),
-}));
-
-// ============================================
-// NEW TABLE RELATIONS
-// ============================================
-
 export const notesRelations = relations(notes, ({ one }) => ({
-  createdBy: one(profiles, {
+  createdBy: one(team, {
     fields: [notes.createdById],
-    references: [profiles.id],
+    references: [team.id],
   }),
 }));
 
 export const mediaItemsRelations = relations(mediaItems, ({ one }) => ({
-  uploadedBy: one(profiles, {
+  uploadedBy: one(team, {
     fields: [mediaItems.uploadedById],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "uploadedBy",
   }),
 }));
@@ -992,16 +1032,14 @@ export const homeInspectionsRelations = relations(homeInspections, ({ one, many 
     fields: [homeInspections.listingId],
     references: [listings.id],
   }),
-  inspectedBy: one(profiles, {
+  inspectedBy: one(team, {
     fields: [homeInspections.inspectedById],
-    references: [profiles.id],
+    references: [team.id],
   }),
-  // MediaItems use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query mediaItems separately using entityType='home_inspection' and entityId=inspection.id
   catalogues: many(homeCatalogues),
 }));
 
-export const homeCataloguesRelations = relations(homeCatalogues, ({ one, many }) => ({
+export const homeCataloguesRelations = relations(homeCatalogues, ({ one }) => ({
   listing: one(listings, {
     fields: [homeCatalogues.listingId],
     references: [listings.id],
@@ -1010,12 +1048,10 @@ export const homeCataloguesRelations = relations(homeCatalogues, ({ one, many })
     fields: [homeCatalogues.inspectionId],
     references: [homeInspections.id],
   }),
-  cataloguedBy: one(profiles, {
+  cataloguedBy: one(team, {
     fields: [homeCatalogues.cataloguedById],
-    references: [profiles.id],
+    references: [team.id],
   }),
-  // MediaItems use polymorphic relationship (entityType/entityId), so we can't use direct relation
-  // Query mediaItems separately using entityType='home_catalogue' and entityId=catalogue.id
 }));
 
 export const buyerEventsRelations = relations(buyerEvents, ({ one }) => ({
@@ -1023,13 +1059,13 @@ export const buyerEventsRelations = relations(buyerEvents, ({ one }) => ({
     fields: [buyerEvents.leadId],
     references: [leads.id],
   }),
-  profile: one(profiles, {
+  profile: one(team, {
     fields: [buyerEvents.profileId],
-    references: [profiles.id],
+    references: [team.id],
   }),
-  createdBy: one(profiles, {
+  createdBy: one(team, {
     fields: [buyerEvents.createdById],
-    references: [profiles.id],
+    references: [team.id],
     relationName: "eventCreator",
   }),
 }));
@@ -1043,9 +1079,9 @@ export const offersRelations = relations(offers, ({ one }) => ({
     fields: [offers.leadId],
     references: [leads.id],
   }),
-  createdBy: one(profiles, {
+  createdBy: one(team, {
     fields: [offers.createdById],
-    references: [profiles.id],
+    references: [team.id],
   }),
 }));
 
@@ -1053,8 +1089,18 @@ export const offersRelations = relations(offers, ({ one }) => ({
 // TYPE EXPORTS
 // ============================================
 
-export type Profile = typeof profiles.$inferSelect;
-export type NewProfile = typeof profiles.$inferInsert;
+export type TeamMember = typeof team.$inferSelect;
+export type NewTeamMember = typeof team.$inferInsert;
+
+// Backwards-compatible aliases (use TeamMember/NewTeamMember in new code)
+export type Profile = TeamMember;
+export type NewProfile = NewTeamMember;
+
+export type Contact = typeof contacts.$inferSelect;
+export type NewContact = typeof contacts.$inferInsert;
+
+export type TeamRoleHistoryEntry = typeof teamRoleHistory.$inferSelect;
+export type NewTeamRoleHistoryEntry = typeof teamRoleHistory.$inferInsert;
 
 export type Building = typeof buildings.$inferSelect;
 export type NewBuilding = typeof buildings.$inferInsert;
@@ -1092,15 +1138,6 @@ export type NewSellerLead = typeof sellerLeads.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
 
-// Role type for RBAC
-export type UserRole = (typeof userRoleEnum.enumValues)[number];
-
-// Seller Lead Status and Source types
-export type SellerLeadStatus = (typeof sellerLeadStatusEnum.enumValues)[number];
-export type SellerLeadSource = (typeof sellerLeadSourceEnum.enumValues)[number];
-export type AuditAction = (typeof auditActionEnum.enumValues)[number];
-
-// New type exports
 export type Note = typeof notes.$inferSelect;
 export type NewNote = typeof notes.$inferInsert;
 
@@ -1119,8 +1156,13 @@ export type NewBuyerEvent = typeof buyerEvents.$inferInsert;
 export type Offer = typeof offers.$inferSelect;
 export type NewOffer = typeof offers.$inferInsert;
 
-export type Contact = typeof contacts.$inferSelect;
-export type NewContact = typeof contacts.$inferInsert;
+// Role type for RBAC
+export type UserRole = (typeof userRoleEnum.enumValues)[number];
+
+// Seller Lead Status and Source types
+export type SellerLeadStatus = (typeof sellerLeadStatusEnum.enumValues)[number];
+export type SellerLeadSource = (typeof sellerLeadSourceEnum.enumValues)[number];
+export type AuditAction = (typeof auditActionEnum.enumValues)[number];
 
 // Enum type exports
 export type DropReason = (typeof dropReasonEnum.enumValues)[number];
@@ -1141,4 +1183,3 @@ export type MediaType = (typeof mediaTypeEnum.enumValues)[number];
 export type InspectionStatus = (typeof inspectionStatusEnum.enumValues)[number];
 export type CatalogueStatus = (typeof catalogueStatusEnum.enumValues)[number];
 export type OfferStatus = (typeof offerStatusEnum.enumValues)[number];
-

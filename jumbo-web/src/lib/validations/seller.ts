@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { createInsertSchema } from "drizzle-zod";
-import { sellerLeads } from "@/lib/db/schema";
 import { indianPhoneSchema } from "./common";
 
 // Seller lead status options
@@ -22,13 +20,6 @@ export const sellerLeadSourceOptions = [
   { value: "referral", label: "Referral" },
 ] as const;
 
-// Base schema from Drizzle for seller leads
-export const insertSellerLeadSchema = createInsertSchema(sellerLeads, {
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  phone: indianPhoneSchema,
-  email: z.string().email("Invalid email address").optional().nullable(),
-});
-
 // Drop reason enum
 export const dropReasonOptions = [
   { value: "not_interested", label: "Not Interested" },
@@ -40,12 +31,14 @@ export const dropReasonOptions = [
 ] as const;
 
 // Create seller lead schema (for form validation)
+// Contact info (name, phone, email) is now used to create/find a Contact,
+// not stored directly on seller_leads.
 export const createSellerLeadSchema = z.object({
-  profileId: z.string().uuid().optional().nullable(),
+  // Contact info — used to create/find contact
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: indianPhoneSchema,
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  secondaryPhone: indianPhoneSchema.optional().nullable(),
+  // Seller lead fields
   status: z.enum(["new", "proposal_sent", "proposal_accepted", "dropped"]).default("new"),
   source: z.enum(["website", "99acres", "magicbricks", "housing", "nobroker", "mygate", "referral"]),
   sourceUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
@@ -59,8 +52,8 @@ export const createSellerLeadSchema = z.object({
   isNri: z.boolean().default(false),
 });
 
-// Create seller (profile) schema
-// Validates the input for creating a new seller profile
+// Create seller (contact) schema
+// Validates the input for creating a new seller contact
 export const createSellerSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   phone: indianPhoneSchema,
@@ -72,4 +65,3 @@ export const updateSellerLeadSchema = createSellerLeadSchema.partial();
 
 export type CreateSellerLeadRequest = z.infer<typeof createSellerLeadSchema>;
 export type UpdateSellerLeadRequest = z.infer<typeof updateSellerLeadSchema>;
-

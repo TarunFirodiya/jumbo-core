@@ -23,7 +23,7 @@ export const GET = withAuth(
           };
           lead?: {
             assignedAgent?: { fullName: string };
-            profile?: { fullName: string };
+            contact?: { name: string };
             status?: string;
           };
         };
@@ -54,7 +54,7 @@ export const GET = withAuth(
             image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${visit.lead?.assignedAgent?.fullName || "Agent"}`,
           },
           client: {
-            name: visit.lead?.profile?.fullName || "Unknown Client",
+            name: visit.lead?.contact?.name || "Unknown Client",
             type: visit.lead?.status || "New Lead",
           },
           status: v.status ? v.status.charAt(0).toUpperCase() + v.status.slice(1) : "Pending",

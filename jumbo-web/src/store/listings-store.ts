@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { ListingStatus } from "@/mock-data/listings";
+
+type ListingStatus = "draft" | "inspection_pending" | "active" | "inactive" | "sold";
 
 interface ListingsStore {
   // Search & Filters

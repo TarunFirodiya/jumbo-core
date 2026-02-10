@@ -35,12 +35,12 @@ function transformOffer(offer: Offer & {
     } | null;
   } | null;
   lead?: {
-    profile?: { fullName: string | null } | null;
+    contact?: { name: string | null } | null;
   } | null;
   createdBy?: { fullName: string | null } | null;
 }): TableOffer {
   const buildingName = offer.listing?.unit?.building?.name || "Unknown Building";
-  const buyerName = offer.lead?.profile?.fullName || "Unknown Buyer";
+  const buyerName = offer.lead?.contact?.name || "Unknown Buyer";
   const agentName = offer.createdBy?.fullName || "Unassigned";
   const agentInitials = agentName
     ? agentName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)

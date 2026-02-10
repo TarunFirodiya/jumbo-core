@@ -2,46 +2,68 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
-const mockVisits = [
-  { id: 1, date: "2023-10-25", time: "10:00 AM", agent: "Sarah Smith", status: "Completed" },
-  { id: 2, date: "2023-10-26", time: "02:00 PM", agent: "Mike Ross", status: "Scheduled" },
-  { id: 3, date: "2023-10-28", time: "11:30 AM", agent: "Sarah Smith", status: "Pending" },
-];
+interface VisitData {
+  id: string;
+  scheduledAt: string | Date;
+  status: string;
+  visitAgent?: {
+    fullName: string;
+  } | null;
+}
 
-export function ListingVisits() {
+interface ListingVisitsProps {
+  visits?: VisitData[];
+}
+
+export function ListingVisits({ visits = [] }: ListingVisitsProps) {
   return (
     <Card className="h-full">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">Recent Visits</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Date</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead className="text-right">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockVisits.map((visit) => (
-              <TableRow key={visit.id}>
-                <TableCell className="font-medium text-xs">
-                    <div>{visit.date}</div>
-                    <div className="text-muted-foreground">{visit.time}</div>
-                </TableCell>
-                <TableCell className="text-xs">{visit.agent}</TableCell>
-                <TableCell className="text-right">
-                  <Badge variant={visit.status === "Completed" ? "outline" : "secondary"} className="text-[10px]">
-                    {visit.status}
-                  </Badge>
-                </TableCell>
+        {visits.length === 0 ? (
+          <div className="text-center text-sm text-muted-foreground py-4">
+            No visits scheduled
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Date</TableHead>
+                <TableHead>Agent</TableHead>
+                <TableHead className="text-right">Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {visits.map((visit) => {
+                const date = new Date(visit.scheduledAt);
+                return (
+                  <TableRow key={visit.id}>
+                    <TableCell className="font-medium text-xs">
+                      <div>{date.toLocaleDateString()}</div>
+                      <div className="text-muted-foreground">
+                        {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {visit.visitAgent?.fullName || "Unassigned"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Badge
+                        variant={visit.status === "completed" ? "outline" : "secondary"}
+                        className="text-[10px]"
+                      >
+                        {visit.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );
 }
-

@@ -43,7 +43,7 @@ export default async function VisitPage({ params }: { params: Promise<{ id: stri
       image: `https://api.dicebear.com/9.x/avataaars/svg?seed=${v.lead?.assignedAgent?.fullName || "Agent"}`,
     },
     client: {
-      name: v.lead?.profile?.fullName || "Unknown Client",
+      name: v.lead?.contact?.name || "Unknown Client",
       type: v.lead?.status ? v.lead.status.charAt(0).toUpperCase() + v.lead.status.slice(1) : "New Lead",
     },
     status: (visitData.status as any) || "Pending",

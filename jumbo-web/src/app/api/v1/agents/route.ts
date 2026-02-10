@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import * as profileService from "@/services/profile.service";
+import * as teamService from "@/services/team.service";
 
 /**
  * GET /api/v1/agents
@@ -7,7 +7,7 @@ import * as profileService from "@/services/profile.service";
  */
 export async function GET() {
   try {
-    const agents = await profileService.getProfilesByRole("buyer_agent");
+    const agents = await teamService.getTeamMembersByRole("buyer_agent");
 
     // Return only necessary fields for dropdown
     const agentOptions = agents.map((agent) => ({
@@ -26,4 +26,3 @@ export async function GET() {
     );
   }
 }
-

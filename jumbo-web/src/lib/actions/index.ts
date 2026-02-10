@@ -41,7 +41,8 @@ import * as buildingService from "@/services/building.service";
 import * as unitService from "@/services/unit.service";
 import * as listingService from "@/services/listing.service";
 import * as leadService from "@/services/lead.service";
-import * as profileService from "@/services/profile.service";
+import * as teamService from "@/services/team.service";
+import * as contactService from "@/services/contact.service";
 import * as visitService from "@/services/visit.service";
 import * as tourService from "@/services/tour.service";
 import * as communicationService from "@/services/communication.service";
@@ -160,7 +161,6 @@ export async function createUnit(data: {
 
 /**
  * Upsert listing (creates Building → Unit → Listing in a transaction)
- * This is the main action for the listing wizard
  */
 export async function upsertListing(data: {
   building:
@@ -195,7 +195,6 @@ export async function upsertListing(data: {
   try {
     const { profile } = await requirePermission("listings:create");
 
-    // Set listing agent ID if not provided
     const listingAgentId = data.listingAgentId ?? profile.id;
 
     const listing = await listingService.upsertListing({
@@ -239,7 +238,6 @@ export async function updateListingStatus(
     await requirePermission("listings:update");
     const validatedData = updateListingStatusSchema.parse(data);
 
-    // Get current listing for audit
     const currentListing = await listingService.getListingById(id);
     if (!currentListing) {
       return {
@@ -289,8 +287,8 @@ export async function createLead(
     await requirePermission("leads:create");
     const validatedData = createLeadRequestSchema.parse(data);
 
-    const lead = await leadService.createLeadWithProfile({
-      profile: {
+    const lead = await leadService.createLeadWithContact({
+      contact: {
         fullName: validatedData.profile.fullName,
         phone: validatedData.profile.phone,
         email: validatedData.profile.email ?? undefined,
@@ -299,7 +297,6 @@ export async function createLead(
       source: validatedData.source ?? undefined,
       status: validatedData.status ?? "new",
       externalId: validatedData.externalId ?? undefined,
-      secondaryPhone: validatedData.secondaryPhone ?? undefined,
       sourceListingId: validatedData.sourceListingId ?? undefined,
       dropReason: validatedData.dropReason ?? undefined,
       locality: validatedData.locality ?? undefined,
@@ -476,7 +473,7 @@ export async function logCommunication(
 }
 
 /**
- * Update buyer (lead + profile)
+ * Update buyer (lead + contact)
  */
 export async function updateBuyer(
   id: string,
@@ -502,7 +499,7 @@ export async function updateBuyer(
       };
     }
 
-    await leadService.updateLeadWithProfile(id, data);
+    await leadService.updateLeadWithContact(id, data);
 
     // Build changes object for audit
     const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -552,7 +549,6 @@ export async function createTour(
   try {
     const validatedData = createTourRequestSchema.parse(data);
 
-    // Convert Date to YYYY-MM-DD string for date column
     const tourDateStr =
       validatedData.tourDate instanceof Date
         ? validatedData.tourDate.toISOString().split("T")[0]
@@ -566,7 +562,6 @@ export async function createTour(
       status: "planned",
     });
 
-    // Link visits to tour
     if (validatedData.visitIds && validatedData.visitIds.length > 0) {
       await tourService.linkVisitsToTour(tour.id, validatedData.visitIds);
     }
@@ -825,7 +820,7 @@ export async function awardCoins(
 // ============================================
 
 /**
- * Update seller (profile)
+ * Update seller (contact)
  */
 export async function updateSeller(
   id: string,
@@ -836,26 +831,26 @@ export async function updateSeller(
   }
 ): Promise<ActionResult> {
   try {
-    const profile = await profileService.getProfileById(id);
-    if (!profile) {
+    const contact = await contactService.getContactById(id);
+    if (!contact) {
       return {
         success: false,
-        error: "PROFILE_NOT_FOUND",
+        error: "CONTACT_NOT_FOUND",
         message: "Seller not found",
       };
     }
 
-    await profileService.updateProfile(id, {
-      ...(data.name && { fullName: data.name }),
+    await contactService.updateContact(id, {
+      ...(data.name && { name: data.name }),
       ...(data.email && { email: data.email }),
       ...(data.mobile && { phone: data.mobile }),
     });
 
     await logActivity({
-      entityType: "profile",
+      entityType: "contact",
       entityId: id,
       action: "update",
-      changes: computeChanges(profile as Record<string, unknown>, data as Record<string, unknown>),
+      changes: computeChanges(contact as unknown as Record<string, unknown>, data as Record<string, unknown>),
     });
 
     revalidatePath(`/sellers/${id}`);
@@ -885,22 +880,23 @@ export async function createSellerLead(
     const { user } = await requirePermission("seller_leads:create");
     const validatedData = createSellerLeadSchema.parse(data);
 
-    const sellerLead = await sellerLeadService.createSellerLead({
-      name: validatedData.name,
-      phone: validatedData.phone,
-      email: validatedData.email,
+    const sellerLead = await sellerLeadService.createSellerLeadWithContact({
+      contact: {
+        name: validatedData.name,
+        phone: validatedData.phone,
+        email: validatedData.email || undefined,
+      },
       status: validatedData.status,
       source: validatedData.source,
-      sourceUrl: validatedData.sourceUrl,
-      sourceListingUrl: validatedData.sourceListingUrl,
-      referredById: validatedData.referredById,
-      buildingId: validatedData.buildingId,
-      unitId: validatedData.unitId,
-      assignedToId: validatedData.assignedToId,
-      followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : null,
+      sourceUrl: validatedData.sourceUrl || undefined,
+      sourceListingUrl: validatedData.sourceListingUrl || undefined,
+      referredById: validatedData.referredById || undefined,
+      buildingId: validatedData.buildingId || undefined,
+      unitId: validatedData.unitId || undefined,
+      assignedToId: validatedData.assignedToId || undefined,
+      followUpDate: validatedData.followUpDate ? new Date(validatedData.followUpDate) : undefined,
       isNri: validatedData.isNri,
-      secondaryPhone: validatedData.secondaryPhone,
-      dropReason: validatedData.dropReason,
+      dropReason: validatedData.dropReason || undefined,
       createdById: user.id,
     });
 
@@ -999,7 +995,6 @@ export async function updateNote(
       };
     }
 
-    // Check if user owns the note
     if (existingNote.createdById !== user.id) {
       return {
         success: false,
@@ -1050,7 +1045,6 @@ export async function deleteNote(noteId: string): Promise<ActionResult> {
       };
     }
 
-    // Check if user owns the note
     if (existingNote.createdById !== user.id) {
       return {
         success: false,
@@ -1301,7 +1295,6 @@ export async function getMediaByEntity(
 // PHASE 5: INSPECTIONS & CATALOGUES
 // ============================================
 
-// Import and re-export inspection actions
 import {
   createInspection,
   updateInspection,
@@ -1311,7 +1304,6 @@ import {
 
 export { createInspection, updateInspection, completeInspection, getInspectionsByListing };
 
-// Import and re-export catalogue actions
 import {
   createCatalogue,
   updateCatalogue,
@@ -1322,7 +1314,6 @@ import {
 
 export { createCatalogue, updateCatalogue, approveCatalogue, rejectCatalogue, getCataloguesByListing };
 
-// Import and re-export offer actions
 import {
   createOffer,
   updateOffer,
@@ -1333,7 +1324,6 @@ import {
 
 export { createOffer, updateOffer, acceptOffer, rejectOffer, counterOffer };
 
-// Import and re-export visit workflow actions
 import {
   confirmVisit,
   cancelVisit,
