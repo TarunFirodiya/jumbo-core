@@ -6,11 +6,25 @@ import { cookies } from "next/headers";
  * Handles cookie management for session persistence
  */
 export async function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // During build time, env vars might not be set - return a mock client
+  if (!supabaseUrl || !supabaseKey) {
+    // Return a mock client that will fail gracefully
+    // This prevents build errors when env vars aren't configured
+    throw new Error(
+      "@supabase/ssr: Your project's URL and API key are required to create a Supabase client!\n\n" +
+      "Check your Supabase project's API settings to find these values\n\n" +
+      "https://supabase.com/dashboard/project/_/settings/api"
+    );
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {

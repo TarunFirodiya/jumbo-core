@@ -8,6 +8,8 @@ import { eq, and, isNull } from "drizzle-orm";
 import { SellerDetailView } from "@/components/sellers/detail/seller-detail-view";
 import type { SellerLeadWithRelations } from "@/types";
 
+export const dynamic = 'force-dynamic';
+
 export default async function SellerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 

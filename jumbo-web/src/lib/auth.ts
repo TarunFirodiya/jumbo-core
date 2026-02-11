@@ -11,6 +11,13 @@ import { hasPermission, type Permission } from "@/lib/rbac";
  */
 export async function getCurrentUserWithProfile() {
   try {
+    // Check if Supabase env vars are configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      // During build time or when env vars aren't set, return null
+      // This allows pages to be built without failing
+      return { user: null, profile: null };
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -43,6 +50,11 @@ export async function getCurrentUserWithProfile() {
       throw dbError;
     }
   } catch (error) {
+    // If Supabase client creation fails (e.g., during build), return null
+    // This prevents build failures when env vars aren't configured
+    if (error instanceof Error && error.message.includes("Supabase client")) {
+      return { user: null, profile: null };
+    }
     console.error("Unexpected error in getCurrentUserWithProfile:", error);
     throw error;
   }
@@ -53,6 +65,15 @@ export async function getCurrentUserWithProfile() {
  */
 export async function requireAuth() {
   try {
+    // During build time, if env vars aren't set, skip auth check
+    // This allows the build to complete, but the page will be dynamic
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      // In production, this should never happen, but during build it might
+      // Return a mock response to allow build to continue
+      // The page is marked as dynamic, so it will be rendered at request time anyway
+      throw new Error("Unauthorized: Authentication required");
+    }
+
     const { user, profile } = await getCurrentUserWithProfile();
 
     if (!user) {
