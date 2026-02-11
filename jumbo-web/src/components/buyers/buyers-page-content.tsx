@@ -2,7 +2,6 @@
 
 import { BuyersStats } from "@/components/buyers/buyers-stats";
 import { BuyersTable } from "@/components/buyers/buyers-table";
-import { BuyersKanban } from "@/components/buyers/buyers-kanban";
 import { NewLeadForm } from "@/components/buyers/new-lead-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -62,11 +61,9 @@ export function BuyersPageContent({ data, pagination, stats }: BuyersPageContent
       description="Manage potential buyers, track requirements, and follow up on leads."
       action={newLeadAction}
       stats={<BuyersStats stats={stats} />}
-      tabs={{
-        listContent: <BuyersTable data={data} pagination={pagination} />,
-        kanbanContent: <BuyersKanban data={data} />,
-      }}
-    />
+    >
+      <BuyersTable data={data} pagination={pagination} />
+    </PageLayout>
   );
 }
 

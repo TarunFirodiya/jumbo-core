@@ -1,18 +1,35 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { team } from "@/lib/db/schema";
+import { isNull, desc } from "drizzle-orm";
 import * as teamService from "@/services/team.service";
+import type { UserRole } from "@/lib/db/schema";
 
 /**
  * GET /api/v1/agents
- * Fetch all agents with buyer_agent role for dropdown selection
+ * Fetch team members for dropdown selection.
+ * Query params:
+ *   - role: filter by role (default: all)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const agents = await teamService.getTeamMembersByRole("buyer_agent");
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get("role") as UserRole | null;
 
-    // Return only necessary fields for dropdown
+    let agents;
+    if (role) {
+      agents = await teamService.getTeamMembersByRole(role);
+    } else {
+      agents = await db.query.team.findMany({
+        where: isNull(team.deletedAt),
+        orderBy: [desc(team.createdAt)],
+      });
+    }
+
     const agentOptions = agents.map((agent) => ({
       id: agent.id,
       fullName: agent.fullName,
+      role: agent.role,
     }));
 
     return NextResponse.json({

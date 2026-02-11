@@ -49,6 +49,7 @@ import * as communicationService from "@/services/communication.service";
 import * as sellerLeadService from "@/services/seller-lead.service";
 import * as noteService from "@/services/note.service";
 import * as mediaService from "@/services/media.service";
+import * as taskService from "@/services/task.service";
 import * as coinService from "@/services/coin.service";
 
 // ============================================
@@ -453,8 +454,12 @@ export async function logCommunication(
     });
 
     revalidatePath("/buyers");
+    revalidatePath("/sellers");
     if (validatedData.leadId) {
       revalidatePath(`/buyers/${validatedData.leadId}`);
+    }
+    if (validatedData.sellerLeadId) {
+      revalidatePath(`/sellers/${validatedData.sellerLeadId}`);
     }
     return {
       success: true,
@@ -486,7 +491,25 @@ export async function updateBuyer(
     name?: string;
     email?: string;
     mobile?: string;
+    whatsapp?: string;
     assignedAgentId?: string;
+    // Direct lead fields
+    locality?: string;
+    zone?: string;
+    pipeline?: boolean;
+    dropReason?: string;
+    referredBy?: string;
+    // Preference fields
+    propertyType?: string;
+    configuration?: string[];
+    maxCap?: string;
+    landmark?: string;
+    floorPreference?: string;
+    khata?: string;
+    mainDoorFacing?: string;
+    mustHaves?: string[];
+    buyReason?: string;
+    preferredBuildings?: string[];
   }
 ): Promise<ActionResult> {
   try {
@@ -531,6 +554,120 @@ export async function updateBuyer(
       success: false,
       error: "BUYER_UPDATE_FAILED",
       message: "Failed to update buyer",
+      details: error,
+    };
+  }
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+/**
+ * Create a task for a lead
+ */
+export async function createTaskForLead(
+  leadId: string,
+  data: {
+    title: string;
+    description?: string;
+    priority?: string;
+    dueAt?: string;
+    assigneeId?: string;
+  }
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const { user } = await requirePermission("leads:update");
+
+    const task = await taskService.createTask({
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
+      assigneeId: data.assigneeId,
+      relatedLeadId: leadId,
+      creatorId: user.id,
+    });
+
+    revalidatePath(`/buyers/${leadId}`);
+    return {
+      success: true,
+      data: { id: task.id },
+      message: "Task created successfully",
+    };
+  } catch (error) {
+    console.error("Error creating task:", error);
+    return {
+      success: false,
+      error: "TASK_CREATE_FAILED",
+      message: "Failed to create task",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Create a task for a seller lead
+ */
+export async function createTaskForSellerLead(
+  sellerLeadId: string,
+  data: {
+    title: string;
+    description?: string;
+    priority?: string;
+    dueAt?: string;
+    assigneeId?: string;
+  }
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const { user } = await requirePermission("seller_leads:create");
+
+    const task = await taskService.createTask({
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
+      assigneeId: data.assigneeId,
+      sellerLeadId,
+      creatorId: user.id,
+    });
+
+    revalidatePath(`/sellers/${sellerLeadId}`);
+    return {
+      success: true,
+      data: { id: task.id },
+      message: "Task created successfully",
+    };
+  } catch (error) {
+    console.error("Error creating task for seller lead:", error);
+    return {
+      success: false,
+      error: "TASK_CREATE_FAILED",
+      message: "Failed to create task",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Complete a task
+ */
+export async function completeTask(taskId: string): Promise<ActionResult> {
+  try {
+    await requirePermission("leads:update");
+
+    await taskService.updateTaskStatus(taskId, "completed");
+
+    return {
+      success: true,
+      message: "Task completed",
+    };
+  } catch (error) {
+    console.error("Error completing task:", error);
+    return {
+      success: false,
+      error: "TASK_COMPLETE_FAILED",
+      message: "Failed to complete task",
       details: error,
     };
   }

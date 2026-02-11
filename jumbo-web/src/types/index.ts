@@ -170,6 +170,28 @@ export type CommunicationChannel = "whatsapp" | "call" | "email";
 // Communication direction types
 export type CommunicationDirection = "inbound" | "outbound";
 
+// Task item for shared tab components
+export interface TaskItem {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  status: string;
+  dueAt: string | null;
+  completedAt: string | null;
+  creatorName: string;
+  assigneeName: string;
+}
+
+// Communication item for shared tab components
+export interface CommunicationItem {
+  id: string;
+  channel: string;
+  direction: string;
+  content: string;
+  createdAt: string;
+}
+
 // Jumbo Coins action types
 export type CoinActionType =
   | "inspection_approved"

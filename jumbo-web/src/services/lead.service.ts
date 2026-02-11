@@ -104,13 +104,22 @@ export async function getLeadByIdWithRelations(id: string) {
     with: {
       contact: true,
       assignedAgent: true,
+      createdBy: true,
       communications: {
         orderBy: (comm, { desc }) => [desc(comm.createdAt)],
-        limit: 10,
+        limit: 50,
       },
       visits: {
+        with: {
+          listing: true,
+          assignedVa: true,
+        },
         orderBy: (visit, { desc }) => [desc(visit.createdAt)],
-        limit: 10,
+        limit: 50,
+      },
+      offers: {
+        orderBy: (offer, { desc }) => [desc(offer.createdAt)],
+        limit: 20,
       },
     },
   });
@@ -291,7 +300,25 @@ export async function updateLeadWithContact(
     name?: string;
     email?: string;
     mobile?: string;
+    whatsapp?: string;
     assignedAgentId?: string;
+    // Direct lead fields
+    locality?: string;
+    zone?: string;
+    pipeline?: boolean;
+    dropReason?: string;
+    referredBy?: string;
+    // Preference fields
+    propertyType?: string;
+    configuration?: string[];
+    maxCap?: string;
+    landmark?: string;
+    floorPreference?: string;
+    khata?: string;
+    mainDoorFacing?: string;
+    mustHaves?: string[];
+    buyReason?: string;
+    preferredBuildings?: string[];
   }
 ): Promise<Lead> {
   const lead = await db.query.leads.findFirst({
@@ -308,6 +335,13 @@ export async function updateLeadWithContact(
   if (data.status) leadUpdates.status = data.status;
   if (data.assignedAgentId) leadUpdates.assignedAgentId = data.assignedAgentId;
 
+  // Direct lead fields
+  if (data.locality !== undefined) leadUpdates.locality = data.locality || null;
+  if (data.zone !== undefined) leadUpdates.zone = data.zone || null;
+  if (data.pipeline !== undefined) leadUpdates.pipeline = data.pipeline;
+  if (data.dropReason !== undefined) leadUpdates.dropReason = data.dropReason || null;
+  if (data.referredBy !== undefined) leadUpdates.referredBy = data.referredBy || null;
+
   // Update requirements JSON if any requirement fields changed
   if (
     data.budget_min !== undefined ||
@@ -322,6 +356,30 @@ export async function updateLeadWithContact(
       ...(data.bhk && { bhk: data.bhk }),
       ...(data.localities && { localities: data.localities }),
     };
+  }
+
+  // Update preferences JSON if any preference fields changed
+  const prefFields = {
+    property_type: data.propertyType,
+    configuration: data.configuration,
+    max_cap: data.maxCap,
+    landmark: data.landmark,
+    floor_preference: data.floorPreference,
+    khata: data.khata,
+    main_door_facing: data.mainDoorFacing,
+    must_haves: data.mustHaves,
+    buy_reason: data.buyReason,
+    preferred_buildings: data.preferredBuildings,
+  };
+
+  const hasPrefChanges = Object.values(prefFields).some((v) => v !== undefined);
+  if (hasPrefChanges) {
+    const existing = (lead.preferenceJson as Record<string, unknown>) ?? {};
+    const updates: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(prefFields)) {
+      if (val !== undefined) updates[key] = val;
+    }
+    leadUpdates.preferenceJson = { ...existing, ...updates };
   }
 
   if (Object.keys(leadUpdates).length > 1) { // >1 because updatedAt is always set

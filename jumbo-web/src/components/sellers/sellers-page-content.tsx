@@ -2,7 +2,6 @@
 
 import { SellersStats } from "@/components/sellers/sellers-stats";
 import { SellersTable } from "@/components/sellers/sellers-table";
-import { SellersKanban } from "@/components/sellers/sellers-kanban";
 import { NewSellerForm } from "@/components/sellers/new-seller-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -55,11 +54,9 @@ export function SellersPageContent({ data, pagination, stats }: SellersPageConte
       description="Manage property seller leads and track their journey."
       action={newSellerAction}
       stats={<SellersStats stats={stats} />}
-      tabs={{
-        listContent: <SellersTable data={data} pagination={pagination} />,
-        kanbanContent: <SellersKanban data={data} />,
-      }}
-    />
+    >
+      <SellersTable data={data} pagination={pagination} />
+    </PageLayout>
   );
 }
 
