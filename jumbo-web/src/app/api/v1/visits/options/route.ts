@@ -21,6 +21,7 @@ export async function GET() {
     const activeListings = await db
       .select({
         id: listings.id,
+        jumboId: listings.jumboId,
         status: listings.status,
         price: listings.askingPrice,
         unitNumber: units.unitNumber,

@@ -16,6 +16,8 @@ import {
   FileText,
   CheckSquare,
   StickyNote,
+  Plus,
+  Home,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,9 +46,20 @@ import { TagInput } from "@/components/ui/tag-input";
 import { BuildingMultiSelect } from "@/components/ui/building-multi-select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+
 import { NotesTab, TasksTab, ActivityTab, CommunicationTab } from "@/components/shared/tabs";
 
-import { updateBuyer } from "@/lib/actions";
+import { updateBuyer, createVisit } from "@/lib/actions";
 import type { TaskItem } from "@/types";
 import { toast } from "sonner";
 
@@ -191,8 +204,88 @@ const KHATA_OPTIONS = [
 // COMPONENT
 // ============================================
 
+// ============================================
+// LISTING OPTION TYPE
+// ============================================
+
+interface ListingOption {
+  id: string;
+  jumboId: string | null;
+  status: string | null;
+  price: string | null;
+  unitNumber: string | null;
+  bhk: number | null;
+  floor: number | null;
+  size: number | null;
+  buildingName: string | null;
+  locality: string | null;
+}
+
 export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: BuyerDetailViewProps) {
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // ── Schedule Visit Modal State ──
+  const [scheduleVisitOpen, setScheduleVisitOpen] = React.useState(false);
+  const [scheduleDate, setScheduleDate] = React.useState<Date | undefined>(undefined);
+  const [selectedListingId, setSelectedListingId] = React.useState("");
+  const [liveListings, setLiveListings] = React.useState<ListingOption[]>([]);
+  const [isLoadingListings, setIsLoadingListings] = React.useState(false);
+  const [isScheduling, setIsScheduling] = React.useState(false);
+
+  // Fetch active listings when modal opens
+  React.useEffect(() => {
+    if (!scheduleVisitOpen) return;
+    let cancelled = false;
+    async function fetchListings() {
+      setIsLoadingListings(true);
+      try {
+        const res = await fetch("/api/v1/visits/options");
+        if (res.ok) {
+          const json = await res.json();
+          if (!cancelled) {
+            setLiveListings(json.data?.listings ?? []);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch listings:", err);
+      } finally {
+        if (!cancelled) setIsLoadingListings(false);
+      }
+    }
+    fetchListings();
+    return () => { cancelled = true; };
+  }, [scheduleVisitOpen]);
+
+  async function handleScheduleVisit() {
+    if (!selectedListingId) {
+      toast.error("Please select a listing");
+      return;
+    }
+    if (!scheduleDate) {
+      toast.error("Please pick a date and time");
+      return;
+    }
+    setIsScheduling(true);
+    try {
+      const result = await createVisit({
+        leadId: id,
+        listingId: selectedListingId,
+        scheduledAt: scheduleDate,
+      });
+      if (result.success) {
+        toast.success(result.message || "Visit scheduled successfully");
+        setScheduleVisitOpen(false);
+        setScheduleDate(undefined);
+        setSelectedListingId("");
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error("Failed to schedule visit");
+    } finally {
+      setIsScheduling(false);
+    }
+  }
 
   const form = useForm<BuyerFormValues>({
     resolver: zodResolver(buyerFormSchema),
@@ -929,11 +1022,24 @@ export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: Buy
                   <TabsContent value="visits" className="m-0">
                     <Card>
                       <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            Visit History
+                          </h3>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setScheduleVisitOpen(true)}
+                          >
+                            <Plus className="size-4 mr-1.5" />
+                            Schedule Visit
+                          </Button>
+                        </div>
                         {buyer.visits.length === 0 ? (
                           <div className="text-center py-12 text-muted-foreground">
                             <Calendar className="size-12 mx-auto mb-3 opacity-40" />
                             <p className="font-medium">No visits recorded yet</p>
-                            <p className="text-sm mt-1">Visits will appear here once scheduled.</p>
+                            <p className="text-sm mt-1">Schedule a visit using the button above.</p>
                           </div>
                         ) : (
                           <div className="overflow-x-auto">
@@ -1003,6 +1109,102 @@ export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: Buy
           }
         />
       </form>
+
+      {/* ── Schedule Visit Modal ── */}
+      <Dialog open={scheduleVisitOpen} onOpenChange={(open) => {
+        setScheduleVisitOpen(open);
+        if (!open) {
+          setScheduleDate(undefined);
+          setSelectedListingId("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Schedule Visit</DialogTitle>
+            <DialogDescription>
+              Schedule a property visit for {buyer?.name || "this buyer"}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Listing Select */}
+            <div className="space-y-2">
+              <Label>Listing</Label>
+              {isLoadingListings ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading listings...
+                </div>
+              ) : liveListings.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-2">
+                  No active listings available.
+                </div>
+              ) : (
+                <Select value={selectedListingId} onValueChange={setSelectedListingId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a listing..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {liveListings.map((listing) => {
+                      const displayId = listing.jumboId || listing.id.slice(0, 8);
+                      const label = [
+                        displayId,
+                        listing.buildingName,
+                        listing.unitNumber ? `Unit ${listing.unitNumber}` : null,
+                        listing.bhk ? `${listing.bhk}BHK` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
+                      return (
+                        <SelectItem key={listing.id} value={listing.id}>
+                          <div className="flex items-center gap-2">
+                            <Home className="size-3.5 shrink-0 text-muted-foreground" />
+                            <span className="truncate">{label}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Date & Time Picker */}
+            <div className="space-y-2">
+              <Label>Date &amp; Time</Label>
+              <DateTimePicker date={scheduleDate} setDate={setScheduleDate} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScheduleVisitOpen(false)}
+              disabled={isScheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleScheduleVisit}
+              disabled={isScheduling || !selectedListingId || !scheduleDate}
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="size-4 animate-spin mr-1.5" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Calendar className="size-4 mr-1.5" />
+                  Schedule Visit
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Form>
   );
 }

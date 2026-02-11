@@ -12,7 +12,7 @@ import { createNote, deleteNote, getNotesByEntity } from "@/lib/actions";
 import { toast } from "sonner";
 
 interface NotesTabProps {
-  entityType: "lead" | "seller_lead";
+  entityType: "lead" | "seller_lead" | "visit";
   entityId: string;
 }
 

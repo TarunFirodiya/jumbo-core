@@ -279,6 +279,7 @@ export async function confirmVisit(visitId: string): Promise<Visit> {
     .set({
       visitConfirmed: true,
       confirmedAt: new Date(),
+      status: "confirmed",
     })
     .where(eq(visits.id, visitId))
     .returning();
@@ -289,7 +290,11 @@ export async function confirmVisit(visitId: string): Promise<Visit> {
 /**
  * Cancel a visit
  */
-export async function cancelVisit(visitId: string, dropReason?: string): Promise<Visit> {
+export async function cancelVisit(
+  visitId: string,
+  dropReason?: string,
+  cancellationNotes?: string
+): Promise<Visit> {
   const visit = await getVisitById(visitId);
   if (!visit) {
     throw new NotFoundError("Visit", visitId);
@@ -304,7 +309,9 @@ export async function cancelVisit(visitId: string, dropReason?: string): Promise
     .set({
       visitCanceled: true,
       canceledAt: new Date(),
+      status: "cancelled",
       dropReason: (dropReason ?? null) as any,
+      ...(cancellationNotes ? { feedbackText: cancellationNotes } : {}),
     })
     .where(eq(visits.id, visitId))
     .returning();

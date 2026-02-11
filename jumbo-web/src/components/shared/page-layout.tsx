@@ -15,7 +15,7 @@ interface PageLayoutProps {
   stats?: ReactNode;
   tabs?: {
     listContent: ReactNode;
-    kanbanContent: ReactNode;
+    kanbanContent?: ReactNode;
     mapContent?: ReactNode;
     defaultValue?: "list" | "kanban" | "map";
     listLabel?: string;

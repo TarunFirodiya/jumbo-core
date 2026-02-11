@@ -31,7 +31,10 @@ export async function confirmVisit(visitId: string): Promise<ActionResult> {
       entityType: "visit",
       entityId: visitId,
       action: "update",
-      changes: { visitConfirmed: { old: visit.visitConfirmed, new: true } },
+      changes: {
+        status: { old: visit.status, new: "confirmed" },
+        visitConfirmed: { old: visit.visitConfirmed, new: true },
+      },
       performedById: user.id,
     });
 
@@ -57,7 +60,8 @@ export async function confirmVisit(visitId: string): Promise<ActionResult> {
  */
 export async function cancelVisit(
   visitId: string,
-  dropReason?: string
+  dropReason?: string,
+  cancellationNotes?: string
 ): Promise<ActionResult> {
   try {
     const { user } = await requirePermission("visits:update");
@@ -71,13 +75,17 @@ export async function cancelVisit(
       };
     }
 
-    await visitService.cancelVisit(visitId, dropReason);
+    await visitService.cancelVisit(visitId, dropReason, cancellationNotes);
 
     await logActivity({
       entityType: "visit",
       entityId: visitId,
       action: "update",
-      changes: { visitCanceled: { old: visit.visitCanceled, new: true } },
+      changes: {
+        status: { old: visit.status, new: "cancelled" },
+        visitCanceled: { old: visit.visitCanceled, new: true },
+        ...(dropReason ? { dropReason: { old: visit.dropReason, new: dropReason } } : {}),
+      },
       performedById: user.id,
     });
 
@@ -85,7 +93,7 @@ export async function cancelVisit(
     revalidatePath(`/visits/${visitId}`);
     return {
       success: true,
-      message: "Visit canceled successfully",
+      message: "Visit cancelled successfully",
     };
   } catch (error) {
     console.error("Error canceling visit:", error);

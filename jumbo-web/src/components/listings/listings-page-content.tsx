@@ -2,7 +2,6 @@
 
 import { ListingsStats } from "@/components/listings/listings-stats";
 import { ListingsTable } from "@/components/listings/listings-table";
-import { ListingsKanban } from "@/components/listings/listings-kanban";
 import { ListingsMap } from "@/components/listings/listings-map";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -38,7 +37,6 @@ export function ListingsPageContent({ data, stats }: ListingsPageContentProps) {
       stats={<ListingsStats stats={stats} />}
       tabs={{
         listContent: <ListingsTable data={data} />,
-        kanbanContent: <ListingsKanban data={data} />,
         mapContent: <ListingsMap data={data} />,
       }}
     />
