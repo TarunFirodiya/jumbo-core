@@ -793,6 +793,83 @@ async function seed() {
     console.log(`✅ Inserted ${auditCount} audit logs.`);
 
     // ================================================================
+    // 13. AUTOMATION TRIGGERS & ACTIONS
+    // ================================================================
+    let triggersCount = 0;
+    let actionsCount = 0;
+
+    // Rule 1: New Lead → Assign Agent (Round Robin) → Create "Qualify" Task
+    const [trigger1] = await db
+      .insert(schema.automationTriggers)
+      .values({
+        name: "New Lead: Assign & Qualify",
+        description:
+          "When a new buyer lead is created, assign to an agent via round-robin and create a qualification task",
+        eventType: "lead_created",
+        conditionJson: { status: "new" },
+        isActive: true,
+      })
+      .returning();
+    triggersCount++;
+
+    await db.insert(schema.automationActions).values({
+      triggerId: trigger1.id,
+      actionType: "assign_agent",
+      payloadTemplate: {},
+      executionOrder: 1,
+      isActive: true,
+    });
+    actionsCount++;
+
+    await db.insert(schema.automationActions).values({
+      triggerId: trigger1.id,
+      actionType: "create_task",
+      payloadTemplate: {
+        title: "Qualify new lead: {{lead_name}}",
+        description:
+          "Contact the new lead within 24 hours. Understand their requirements, budget, and timeline. Update lead status accordingly.",
+        priority: "high",
+        due_in_days: 1,
+      },
+      executionOrder: 2,
+      isActive: true,
+    });
+    actionsCount++;
+
+    // Rule 2: Visit Completed → Create "Feedback" Task
+    const [trigger2] = await db
+      .insert(schema.automationTriggers)
+      .values({
+        name: "Visit Completed: Collect Feedback",
+        description:
+          "When a visit is marked completed, create a feedback collection task for the assigned agent",
+        eventType: "visit_completed",
+        conditionJson: {},
+        isActive: true,
+      })
+      .returning();
+    triggersCount++;
+
+    await db.insert(schema.automationActions).values({
+      triggerId: trigger2.id,
+      actionType: "create_task",
+      payloadTemplate: {
+        title: "Collect feedback after visit",
+        description:
+          "Call the buyer and collect feedback on the property visited. Ask about interest level, concerns, and next steps.",
+        priority: "medium",
+        due_in_days: 1,
+      },
+      executionOrder: 1,
+      isActive: true,
+    });
+    actionsCount++;
+
+    console.log(
+      `✅ Inserted ${triggersCount} automation triggers and ${actionsCount} automation actions.`
+    );
+
+    // ================================================================
     // SUMMARY
     // ================================================================
     console.log("\n========================================");
@@ -813,6 +890,8 @@ async function seed() {
     console.log(`  Ledger entries:  ${ledgerCount}`);
     console.log(`  Notes:           ${notesCount}`);
     console.log(`  Audit logs:      ${auditCount}`);
+    console.log(`  Auto triggers:   ${triggersCount}`);
+    console.log(`  Auto actions:    ${actionsCount}`);
     console.log("========================================\n");
 
   } catch (error) {

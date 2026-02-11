@@ -33,12 +33,12 @@ import {
 } from "@/components/ui/dialog";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 
-import { createTaskForLead, createTaskForSellerLead, completeTask } from "@/lib/actions";
+import { createTaskForLead, createTaskForSellerLead, createTaskForListing, completeTask } from "@/lib/actions";
 import { toast } from "sonner";
 import type { TaskItem } from "@/types";
 
 interface TasksTabProps {
-  entityType: "lead" | "seller_lead";
+  entityType: "lead" | "seller_lead" | "listing";
   entityId: string;
   initialTasks: TaskItem[];
 }
@@ -102,7 +102,9 @@ export function TasksTab({ entityType, entityId, initialTasks }: TasksTabProps) 
 
       const result = entityType === "lead"
         ? await createTaskForLead(entityId, taskData)
-        : await createTaskForSellerLead(entityId, taskData);
+        : entityType === "seller_lead"
+        ? await createTaskForSellerLead(entityId, taskData)
+        : await createTaskForListing(entityId, taskData);
 
       if (result.success) {
         toast.success("Task created");

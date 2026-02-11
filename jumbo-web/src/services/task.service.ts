@@ -36,6 +36,20 @@ export async function getTasksBySellerLeadId(sellerLeadId: string) {
 }
 
 /**
+ * Get tasks by listing ID
+ */
+export async function getTasksByListingId(listingId: string) {
+  return db.query.tasks.findMany({
+    where: and(eq(tasks.listingId, listingId), isNull(tasks.deletedAt)),
+    with: {
+      creator: true,
+      assignee: true,
+    },
+    orderBy: [desc(tasks.createdAt)],
+  });
+}
+
+/**
  * Create a task
  */
 export async function createTask(data: {
@@ -46,6 +60,7 @@ export async function createTask(data: {
   assigneeId?: string;
   relatedLeadId?: string;
   sellerLeadId?: string;
+  listingId?: string;
   creatorId?: string;
 }): Promise<Task> {
   const [task] = await db
@@ -58,6 +73,7 @@ export async function createTask(data: {
       assigneeId: data.assigneeId ?? null,
       relatedLeadId: data.relatedLeadId ?? null,
       sellerLeadId: data.sellerLeadId ?? null,
+      listingId: data.listingId ?? null,
       creatorId: data.creatorId ?? null,
       status: "open",
     })

@@ -13,6 +13,9 @@ export const inventoryTypeEnum = z.enum(["primary", "secondary", "resale"]);
 export const urgencyEnum = z.enum(["low", "medium", "high", "urgent"]);
 export const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
 
+export const LISTING_STATUSES = ["draft", "proposal_sent", "proposal_accepted", "inspection_pending", "catalogue_pending", "live", "on_hold", "sold"] as const;
+export const listingTierEnum = z.enum(["reserve", "cash_plus", "lite"]);
+
 // Base schemas from Drizzle
 export const insertListingSchema = createInsertSchema(listings);
 export const selectListingSchema = createSelectSchema(listings);
@@ -51,7 +54,7 @@ export const createListingRequestSchema = z.object({
 });
 
 export const updateListingStatusSchema = z.object({
-  status: z.enum(["draft", "inspection_pending", "cataloguing_pending", "active", "on_hold", "sold", "delisted"]),
+  status: z.enum(LISTING_STATUSES),
 });
 
 export const updateListingPriceSchema = z.object({
@@ -82,7 +85,8 @@ export const updateListingSchema = z.object({
   occupancy: occupancyEnum.optional(),
   furnishing: furnishingEnum.optional(),
   zoneLeadId: z.string().uuid().optional().nullable(),
-  status: z.enum(["draft", "inspection_pending", "cataloguing_pending", "active", "on_hold", "sold", "delisted"]).optional(),
+  tier: listingTierEnum.optional().nullable(),
+  status: z.enum(LISTING_STATUSES).optional(),
   onHold: z.boolean().optional(),
   sold: z.boolean().optional(),
   soldBy: soldByEnum.optional(),
@@ -92,6 +96,10 @@ export const updateListingSchema = z.object({
   mouDate: z.string().datetime().optional().nullable(),
   sourcePrice: z.number().positive().optional(),
   urgency: urgencyEnum.optional(),
+  videoUrl: z.string().url().optional().nullable(),
+  floorPlanUrl: z.string().url().optional().nullable(),
+  tour3dUrl: z.string().url().optional().nullable(),
+  brochureUrl: z.string().url().optional().nullable(),
   gtmJumboListingUrl: z.string().url().optional(),
   gtmWebsiteLiveDate: z.string().datetime().optional().nullable(),
   gtmHousingUrl: z.string().url().optional(),
@@ -123,7 +131,7 @@ export const updateListingSchema = z.object({
 
 // Query params schema
 export const listingQuerySchema = z.object({
-  status: z.enum(["draft", "inspection_pending", "cataloguing_pending", "active", "on_hold", "sold", "delisted"]).optional(),
+  status: z.enum(LISTING_STATUSES).optional(),
   isVerified: z.coerce.boolean().optional(),
   minPrice: z.coerce.number().positive().optional(),
   maxPrice: z.coerce.number().positive().optional(),
@@ -153,4 +161,3 @@ export type UpdateListingPrice = z.infer<typeof updateListingPriceSchema>;
 export type VerifyListing = z.infer<typeof verifyListingSchema>;
 export type ListingQuery = z.infer<typeof listingQuerySchema>;
 export type PublicListingQuery = z.infer<typeof publicListingQuerySchema>;
-

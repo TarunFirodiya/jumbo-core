@@ -68,9 +68,10 @@ export type {
   InspectionStatus,
   CatalogueStatus,
   OfferStatus,
+  ListingTier,
 } from "@/lib/db/schema";
 
-import { TeamMember, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer, BuyerEvent, Contact } from "@/lib/db/schema";
+import { TeamMember, Lead, SellerLead, Building, Unit, AuditLog, Communication, Task, Listing, Note, MediaItem, HomeInspection, HomeCatalogue, Offer, BuyerEvent, Contact, Visit } from "@/lib/db/schema";
 
 export type LeadWithRelations = Lead & {
   contact: Contact | null;
@@ -83,12 +84,17 @@ export type LeadWithRelations = Lead & {
 export type ListingWithRelations = Listing & {
   unit: (Unit & {
     building: Building | null;
+    owner?: TeamMember | null;
   }) | null;
+  listingAgent?: TeamMember | null;
+  zoneLead?: TeamMember | null;
   notes?: Note[];
   mediaItems?: MediaItem[];
   homeInspections?: HomeInspection[];
   homeCatalogues?: HomeCatalogue[];
   offers?: Offer[];
+  visits?: Visit[];
+  tasks?: Task[];
 };
 
 export type SellerLeadWithRelations = SellerLead & {
@@ -142,7 +148,7 @@ export interface ApiErrorResponse {
 export type LeadStatus = "new" | "contacted" | "active_visitor" | "at_risk" | "closed";
 
 // Listing status types
-export type ListingStatus = "draft" | "inspection_pending" | "cataloguing_pending" | "active" | "on_hold" | "sold" | "delisted";
+export type ListingStatus = "draft" | "proposal_sent" | "proposal_accepted" | "inspection_pending" | "catalogue_pending" | "live" | "on_hold" | "sold";
 
 // Task priority types
 export type TaskPriority = "low" | "medium" | "high" | "urgent";

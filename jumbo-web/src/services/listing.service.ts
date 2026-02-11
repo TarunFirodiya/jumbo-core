@@ -266,7 +266,7 @@ export async function getActiveListings(
 ): Promise<PaginatedResult<Listing>> {
   return getListings({
     ...filters,
-    status: "active",
+    status: "live",
     isVerified: true,
   });
 }
@@ -285,8 +285,8 @@ export async function updateListingStatus(id: string, status: string): Promise<L
     updatedAt: new Date(),
   };
 
-  // Set publishedAt when status becomes active
-  if (status === "active" && existing.status !== "active") {
+  // Set publishedAt when status becomes live
+  if (status === "live" && existing.status !== "live") {
     updateData.publishedAt = new Date();
   }
 

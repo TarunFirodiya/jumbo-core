@@ -39,6 +39,10 @@ export * as inspectionService from "./inspection.service";
 export * as catalogueService from "./catalogue.service";
 export * as offerService from "./offer.service";
 
+// Automation & Notification Services
+export * as automationService from "./automation.service";
+export * as notificationService from "./notification.service";
+
 // Types
 export * from "./types";
 

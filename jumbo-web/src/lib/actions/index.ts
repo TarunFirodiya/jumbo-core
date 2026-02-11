@@ -650,6 +650,99 @@ export async function createTaskForSellerLead(
 }
 
 /**
+ * Create a task for a listing
+ */
+export async function createTaskForListing(
+  listingId: string,
+  data: {
+    title: string;
+    description?: string;
+    priority?: string;
+    dueAt?: string;
+    assigneeId?: string;
+  }
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const { user } = await requirePermission("listings:update");
+
+    const task = await taskService.createTask({
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
+      assigneeId: data.assigneeId,
+      listingId,
+      creatorId: user.id,
+    });
+
+    revalidatePath(`/listings/${listingId}`);
+    return {
+      success: true,
+      data: { id: task.id },
+      message: "Task created successfully",
+    };
+  } catch (error) {
+    console.error("Error creating task for listing:", error);
+    return {
+      success: false,
+      error: "TASK_CREATE_FAILED",
+      message: "Failed to create task",
+      details: error,
+    };
+  }
+}
+
+/**
+ * Mark listing as sold (with details)
+ */
+export async function markListingAsSold(
+  id: string,
+  soldBy: "jumbo" | "owner" | "other_agent",
+  sellingPrice?: number
+): Promise<ActionResult> {
+  try {
+    await requirePermission("listings:update");
+
+    const currentListing = await listingService.getListingById(id);
+    if (!currentListing) {
+      return {
+        success: false,
+        error: "LISTING_NOT_FOUND",
+        message: "Listing not found",
+      };
+    }
+
+    await listingService.markListingAsSold(id, soldBy, sellingPrice);
+
+    await logActivity({
+      entityType: "listing",
+      entityId: id,
+      action: "update",
+      changes: {
+        status: { old: currentListing.status, new: "sold" },
+        soldBy: { old: null, new: soldBy },
+        ...(sellingPrice ? { sellingPrice: { old: null, new: sellingPrice } } : {}),
+      },
+    });
+
+    revalidatePath("/listings");
+    revalidatePath(`/listings/${id}`);
+    return {
+      success: true,
+      message: "Listing marked as sold",
+    };
+  } catch (error) {
+    console.error("Error marking listing as sold:", error);
+    return {
+      success: false,
+      error: "LISTING_SOLD_FAILED",
+      message: "Failed to mark listing as sold",
+      details: error,
+    };
+  }
+}
+
+/**
  * Complete a task
  */
 export async function completeTask(taskId: string): Promise<ActionResult> {

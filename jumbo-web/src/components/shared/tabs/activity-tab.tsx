@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { AuditLogWithRelations } from "@/types";
 
 interface ActivityTabProps {
-  entityType: "lead" | "seller_lead" | "visit";
+  entityType: "lead" | "seller_lead" | "visit" | "listing";
   entityId: string;
 }
 

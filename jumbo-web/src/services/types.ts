@@ -22,6 +22,10 @@ import type {
   CreditLedgerEntry,
   CreditRule,
   Contact,
+  AutomationTrigger,
+  AutomationAction,
+  AutomationExecutionLog,
+  Notification,
 } from "@/lib/db/schema";
 
 // ============================================
@@ -198,4 +202,8 @@ export type {
   CreditLedgerEntry,
   CreditRule,
   Contact,
+  AutomationTrigger,
+  AutomationAction,
+  AutomationExecutionLog,
+  Notification,
 };

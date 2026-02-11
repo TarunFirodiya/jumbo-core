@@ -129,6 +129,12 @@ export const soldByEnum = pgEnum("sold_by", [
   "other_agent",
 ]);
 
+export const listingTierEnum = pgEnum("listing_tier", [
+  "reserve",
+  "cash_plus",
+  "lite",
+]);
+
 export const inventoryTypeEnum = pgEnum("inventory_type", [
   "primary",
   "secondary",
@@ -322,11 +328,13 @@ export const listings = pgTable("listings", {
   id: uuid("id").primaryKey().defaultRandom(),
   unitId: uuid("unit_id").references(() => units.id),
   listingAgentId: uuid("listing_agent_id").references(() => team.id),
+  listingCode: integer("listing_code"),
   jumboId: text("jumbo_id"),
   hid: text("hid"),
   listingSlug: text("listing_slug"),
   configuration: configurationEnum("configuration"),
   flatNumber: text("flat_number"),
+  tier: listingTierEnum("tier"),
   status: text("status").default("draft"),
   askingPrice: numeric("asking_price"),
   askPriceLacs: numeric("ask_price_lacs"),
@@ -372,6 +380,10 @@ export const listings = pgTable("listings", {
   builderUnit: boolean("builder_unit").default(false),
   description: text("description"),
   images: jsonb("images").$type<string[]>().default([]),
+  videoUrl: text("video_url"),
+  floorPlanUrl: text("floor_plan_url"),
+  tour3dUrl: text("tour_3d_url"),
+  brochureUrl: text("brochure_url"),
   mediaJson: jsonb("media_json").$type<Record<string, string[]>>(),
   amenitiesJson: jsonb("amenities_json").$type<string[]>().default([]),
   externalIds: jsonb("external_ids").$type<{
@@ -567,6 +579,7 @@ export const tasks = pgTable("tasks", {
   dueAt: timestamp("due_at", { withTimezone: true }),
   relatedLeadId: uuid("related_lead_id").references(() => leads.id),
   sellerLeadId: uuid("seller_lead_id").references(() => sellerLeads.id),
+  listingId: uuid("listing_id").references(() => listings.id),
   status: text("status").default("open"),
   updatedById: uuid("updated_by_id").references(() => team.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -743,6 +756,68 @@ export const offers = pgTable("offers", {
 });
 
 // ============================================
+// 15. AUTOMATION ENGINE (Triggers & Actions)
+// ============================================
+
+export const automationTriggers = pgTable("automation_triggers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  eventType: text("event_type").notNull(), // e.g. lead_created, lead_status_changed, visit_completed
+  conditionJson: jsonb("condition_json").$type<Record<string, unknown>>(), // e.g. { "status": "new" }
+  isActive: boolean("is_active").default(true),
+  createdById: uuid("created_by_id").references(() => team.id),
+  updatedById: uuid("updated_by_id").references(() => team.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export const automationActions = pgTable("automation_actions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  triggerId: uuid("trigger_id")
+    .references(() => automationTriggers.id, { onDelete: "cascade" })
+    .notNull(),
+  actionType: text("action_type").notNull(), // assign_agent, create_task, webhook_call
+  payloadTemplate: jsonb("payload_template").$type<Record<string, unknown>>(), // JSON with {{lead.name}} placeholders
+  executionOrder: integer("execution_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const automationExecutionLogs = pgTable("automation_execution_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  triggerId: uuid("trigger_id").references(() => automationTriggers.id),
+  actionId: uuid("action_id").references(() => automationActions.id),
+  eventType: text("event_type").notNull(),
+  eventPayload: jsonb("event_payload").$type<Record<string, unknown>>(),
+  actionType: text("action_type").notNull(),
+  status: text("status").default("pending"), // pending, success, failed
+  resultJson: jsonb("result_json").$type<Record<string, unknown>>(),
+  errorMessage: text("error_message"),
+  executedAt: timestamp("executed_at", { withTimezone: true }).defaultNow(),
+});
+
+// ============================================
+// 16. NOTIFICATIONS (In-app bell icon)
+// ============================================
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => team.id)
+    .notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // e.g. /buyers/abc-123 or /visits/xyz
+  isRead: boolean("is_read").default(false),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+});
+
+// ============================================
 // RELATIONS
 // ============================================
 
@@ -777,6 +852,8 @@ export const teamRelations = relations(team, ({ many, one }) => ({
   assignedVisits: many(visits, { relationName: "assignedVa" }),
   completedVisits: many(visits, { relationName: "completedBy" }),
   roleHistory: many(teamRoleHistory),
+  notifications: many(notifications, { relationName: "userNotifications" }),
+  createdTriggers: many(automationTriggers, { relationName: "triggerCreatedBy" }),
   contact: one(contacts, {
     fields: [team.contactId],
     references: [contacts.id],
@@ -853,6 +930,7 @@ export const listingsRelations = relations(listings, ({ one, many }) => ({
   homeCatalogues: many(homeCatalogues),
   offers: many(offers),
   communications: many(communications),
+  tasks: many(tasks),
 }));
 
 export const leadsRelations = relations(leads, ({ one, many }) => ({
@@ -996,6 +1074,10 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     fields: [tasks.sellerLeadId],
     references: [sellerLeads.id],
   }),
+  listing: one(listings, {
+    fields: [tasks.listingId],
+    references: [listings.id],
+  }),
 }));
 
 export const creditLedgerRelations = relations(creditLedger, ({ one }) => ({
@@ -1085,6 +1167,43 @@ export const offersRelations = relations(offers, ({ one }) => ({
   }),
 }));
 
+export const automationTriggersRelations = relations(automationTriggers, ({ many, one }) => ({
+  actions: many(automationActions),
+  executionLogs: many(automationExecutionLogs),
+  createdBy: one(team, {
+    fields: [automationTriggers.createdById],
+    references: [team.id],
+    relationName: "triggerCreatedBy",
+  }),
+}));
+
+export const automationActionsRelations = relations(automationActions, ({ one, many }) => ({
+  trigger: one(automationTriggers, {
+    fields: [automationActions.triggerId],
+    references: [automationTriggers.id],
+  }),
+  executionLogs: many(automationExecutionLogs),
+}));
+
+export const automationExecutionLogsRelations = relations(automationExecutionLogs, ({ one }) => ({
+  trigger: one(automationTriggers, {
+    fields: [automationExecutionLogs.triggerId],
+    references: [automationTriggers.id],
+  }),
+  action: one(automationActions, {
+    fields: [automationExecutionLogs.actionId],
+    references: [automationActions.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(team, {
+    fields: [notifications.userId],
+    references: [team.id],
+    relationName: "userNotifications",
+  }),
+}));
+
 // ============================================
 // TYPE EXPORTS
 // ============================================
@@ -1156,6 +1275,18 @@ export type NewBuyerEvent = typeof buyerEvents.$inferInsert;
 export type Offer = typeof offers.$inferSelect;
 export type NewOffer = typeof offers.$inferInsert;
 
+export type AutomationTrigger = typeof automationTriggers.$inferSelect;
+export type NewAutomationTrigger = typeof automationTriggers.$inferInsert;
+
+export type AutomationAction = typeof automationActions.$inferSelect;
+export type NewAutomationAction = typeof automationActions.$inferInsert;
+
+export type AutomationExecutionLog = typeof automationExecutionLogs.$inferSelect;
+export type NewAutomationExecutionLog = typeof automationExecutionLogs.$inferInsert;
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+
 // Role type for RBAC
 export type UserRole = (typeof userRoleEnum.enumValues)[number];
 
@@ -1183,3 +1314,4 @@ export type MediaType = (typeof mediaTypeEnum.enumValues)[number];
 export type InspectionStatus = (typeof inspectionStatusEnum.enumValues)[number];
 export type CatalogueStatus = (typeof catalogueStatusEnum.enumValues)[number];
 export type OfferStatus = (typeof offerStatusEnum.enumValues)[number];
+export type ListingTier = (typeof listingTierEnum.enumValues)[number];
