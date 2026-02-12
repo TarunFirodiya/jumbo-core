@@ -205,6 +205,17 @@ export const contactTypeEnum = pgEnum("contact_type", [
   "internal",
 ]);
 
+export const buyerLeadStageEnum = pgEnum("buyer_lead_stage", [
+  "NEW_LEAD",
+  "QUALIFIED",
+  "REACTIVATED",
+  "AT_RISK_LEAD",
+  "INACTIVE_LEAD",
+  "ACTIVE_VISITOR",
+  "AT_RISK_VISITOR",
+  "INACTIVE_VISITOR",
+]);
+
 // ============================================
 // 0. UNIVERSAL CONTACTS (Identity Layer)
 // ============================================
@@ -422,6 +433,8 @@ export const leads = pgTable("leads", {
   referredBy: text("referred_by"),
   testListingId: text("test_listing_id"),
   status: text("status").default("new"),
+  stage: buyerLeadStageEnum("stage").default("NEW_LEAD"),
+  lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
   assignedAgentId: uuid("assigned_agent_id").references(() => team.id),
   requirementJson: jsonb("requirement_json").$type<{
     bhk?: number[];

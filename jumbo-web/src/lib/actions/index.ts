@@ -51,6 +51,7 @@ import * as noteService from "@/services/note.service";
 import * as mediaService from "@/services/media.service";
 import * as taskService from "@/services/task.service";
 import * as coinService from "@/services/coin.service";
+import * as lifecycleService from "@/services/lead-lifecycle.service";
 
 // ============================================
 // TYPES & HELPERS
@@ -483,7 +484,6 @@ export async function logCommunication(
 export async function updateBuyer(
   id: string,
   data: {
-    status?: string;
     budget_min?: number;
     budget_max?: number;
     bhk?: number[];
@@ -513,6 +513,8 @@ export async function updateBuyer(
   }
 ): Promise<ActionResult> {
   try {
+    const { user } = await requirePermission("leads:update");
+
     const currentLead = await leadService.getLeadByIdWithRelations(id);
     if (!currentLead) {
       return {
@@ -522,24 +524,71 @@ export async function updateBuyer(
       };
     }
 
+    // Snapshot relevant fields before update for change detection
+    const contact = Array.isArray(currentLead.contact) ? currentLead.contact[0] : currentLead.contact;
+    const oldReq = (currentLead.requirementJson ?? {}) as Record<string, unknown>;
+    const oldPref = (currentLead.preferenceJson ?? {}) as Record<string, unknown>;
+
+    const before: Record<string, unknown> = {
+      name: contact?.name ?? null,
+      email: contact?.email ?? null,
+      mobile: contact?.phone ?? null,
+      locality: currentLead.locality,
+      zone: currentLead.zone,
+      pipeline: currentLead.pipeline,
+      dropReason: currentLead.dropReason,
+      referredBy: currentLead.referredBy,
+      assignedAgentId: currentLead.assignedAgentId,
+      budget_min: oldReq.budget_min ?? null,
+      budget_max: oldReq.budget_max ?? null,
+      bhk: oldReq.bhk ?? [],
+      localities: oldReq.localities ?? [],
+      propertyType: oldPref.property_type ?? null,
+      configuration: oldPref.configuration ?? [],
+      maxCap: oldPref.max_cap ?? null,
+      landmark: oldPref.landmark ?? null,
+      floorPreference: oldPref.floor_preference ?? null,
+      khata: oldPref.khata ?? null,
+      mainDoorFacing: oldPref.main_door_facing ?? null,
+      mustHaves: oldPref.must_haves ?? [],
+      buyReason: oldPref.buy_reason ?? null,
+      preferredBuildings: oldPref.preferred_buildings ?? [],
+    };
+
     await leadService.updateLeadWithContact(id, data);
 
-    // Build changes object for audit
-    const changes: Record<string, { old: unknown; new: unknown }> = {};
-    if (data.status && data.status !== currentLead.status) {
-      changes.status = { old: currentLead.status, new: data.status };
-    }
-    if (data.assignedAgentId && data.assignedAgentId !== currentLead.assignedAgentId) {
-      changes.assignedAgentId = { old: currentLead.assignedAgentId, new: data.assignedAgentId };
+    // Build "after" snapshot from submitted data
+    const after: Record<string, unknown> = {};
+    for (const key of Object.keys(before)) {
+      if ((data as Record<string, unknown>)[key] !== undefined) {
+        after[key] = (data as Record<string, unknown>)[key];
+      }
     }
 
-    if (Object.keys(changes).length > 0) {
+    const changes = computeChanges(before, { ...before, ...after });
+    if (changes) {
       await logActivity({
         entityType: "lead",
         entityId: id,
         action: "update",
         changes,
+        performedById: user.id,
       });
+    }
+
+    // Trigger lifecycle hook if preferences were changed
+    const prefKeys = [
+      "propertyType", "configuration", "maxCap", "landmark",
+      "floorPreference", "khata", "mainDoorFacing", "mustHaves",
+      "buyReason", "preferredBuildings",
+    ];
+    const hasPreferenceChanges = prefKeys.some(
+      (k) => (data as Record<string, unknown>)[k] !== undefined
+    );
+    if (hasPreferenceChanges) {
+      lifecycleService.onPreferenceSaved(id).catch((err) =>
+        console.error("Failed to update lifecycle stage on preference save:", err)
+      );
     }
 
     revalidatePath(`/buyers/${id}`);

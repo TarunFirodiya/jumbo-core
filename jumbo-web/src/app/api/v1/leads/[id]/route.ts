@@ -4,6 +4,7 @@ import { logActivity, computeChanges } from "@/lib/audit";
 import { createLeadRequestSchema, updateLeadStatusSchema, assignLeadSchema } from "@/lib/validations/lead";
 import { z } from "zod";
 import * as leadService from "@/services/lead.service";
+import * as lifecycleService from "@/services/lead-lifecycle.service";
 
 // Update lead schema (partial of create schema)
 const updateLeadSchema = createLeadRequestSchema.partial().extend({
@@ -174,6 +175,13 @@ export async function PUT(
         changes,
         performedById: user.id,
       });
+    }
+
+    // Trigger lifecycle check if preferences were updated
+    if (validatedData.preferences !== undefined) {
+      lifecycleService.onPreferenceSaved(id).catch((err) =>
+        console.error("Failed to update lifecycle stage on preference save:", err)
+      );
     }
 
     const leadWithRelations = await leadService.getLeadById(id);

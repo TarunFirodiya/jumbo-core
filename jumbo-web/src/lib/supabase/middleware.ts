@@ -10,9 +10,11 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
-  // Check if Supabase credentials are configured
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Check if Supabase credentials are configured (also check Vercel Integration keys)
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
     console.warn("Supabase credentials not configured. Skipping auth middleware.");

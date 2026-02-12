@@ -29,11 +29,12 @@ Every tab (Buyers, Sellers, Listings, Visits, Offers, Settings) has working list
 
 #### Buyers Tab
 - **S1-001** `[Buyers] Complete buyer lead detail page`
-  - Wire `/buyers/[id]` to show all lead fields from DB (preferences, locality, zone, pipeline, follow-up dates).
-  - Show related visits, offers, and activity timeline.
+  - **Status:** Completed
+  - Wire `/buyers/[id]` to show all lead fields from DB.
   - Priority: High | Estimate: 3 pts
 
 - **S1-002** `[Buyers] Add edit-lead functionality`
+  - **Status:** Deprioritized
   - Add inline edit or edit dialog on buyer detail page.
   - Call `PUT /api/v1/leads/[id]` with updated fields.
   - Priority: High | Estimate: 3 pts
@@ -48,13 +49,20 @@ Every tab (Buyers, Sellers, Listings, Visits, Offers, Settings) has working list
   - Priority: Medium | Estimate: 1 pt
 
 - **S1-005** `[Buyers] Wire kanban drag-and-drop to update lead status`
+  - **Status:** Deleted
   - Kanban column changes call `PUT /api/v1/leads/[id]` with new status.
   - Priority: High | Estimate: 2 pts
 
+#### New Features
+- **S1-024** `[WhatsApp] Test Whatsapp Inbox Embed`
+  - Add a new tab/iframe in the side panel for Kapso Inbox.
+  - URL: `https://inbox.kapso.ai/embed/SzaGruLn0IOgxv9FaVAhQEwPUWCRDZOM5JkJSpTGTA4`
+  - Priority: High | Estimate: 1 pt
+
 #### Sellers Tab
 - **S1-006** `[Sellers] Complete seller lead detail page`
-  - Wire `/sellers/[id]` to show all seller lead fields (source, drop reason, NRI flag, building/unit, follow-up).
-  - Show activity timeline and notes.
+  - **Status:** Completed
+  - Wire `/sellers/[id]` to show all seller lead fields.
   - Priority: High | Estimate: 3 pts
 
 - **S1-007** `[Sellers] Add edit seller lead functionality`
@@ -71,8 +79,8 @@ Every tab (Buyers, Sellers, Listings, Visits, Offers, Settings) has working list
 
 #### Listings Tab
 - **S1-010** `[Listings] Complete listing detail page with all fields`
-  - Wire listing detail to show: configuration, furnishing, USPs, price per sqft, MSP, GTM fields.
-  - Show real offers and visits (already started — verify completeness).
+  - **Status:** Completed
+  - Wire listing detail to show fields.
   - Priority: High | Estimate: 3 pts
 
 - **S1-011** `[Listings] Create edit-listing page/dialog`

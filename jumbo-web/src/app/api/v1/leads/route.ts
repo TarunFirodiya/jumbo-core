@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createLeadRequestSchema, leadQuerySchema } from "@/lib/validations";
 import { withAuth } from "@/lib/api-helpers";
 import * as leadService from "@/services/lead.service";
+import * as lifecycleService from "@/services/lead-lifecycle.service";
 
 /**
  * GET /api/v1/leads
@@ -123,6 +124,11 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("Created new lead:", lead.id);
+
+    // Set initial lifecycle stage — lastActiveAt = now for new leads
+    lifecycleService.registerActivity(lead.id, "INQUIRY").catch((err) =>
+      console.error("Failed to set initial lifecycle stage:", err)
+    );
 
     // Fetch lead with relations
     const leadWithRelations = await leadService.getLeadById(lead.id);

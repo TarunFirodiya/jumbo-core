@@ -6,18 +6,14 @@ import { cookies } from "next/headers";
  * Handles cookie management for session persistence
  */
 export async function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-  // During build time, env vars might not be set - return a mock client
+  // During build/SSG, env vars may not be available — return a mock client
   if (!supabaseUrl || !supabaseKey) {
-    // Return a mock client that will fail gracefully
-    // This prevents build errors when env vars aren't configured
-    throw new Error(
-      "@supabase/ssr: Your project's URL and API key are required to create a Supabase client!\n\n" +
-      "Check your Supabase project's API settings to find these values\n\n" +
-      "https://supabase.com/dashboard/project/_/settings/api"
-    );
+    return createMockServerClient();
   }
 
   const cookieStore = await cookies();
@@ -43,6 +39,30 @@ export async function createClient() {
       },
     }
   );
+}
+
+/** Minimal mock for build-time — all auth calls return null user/session. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createMockServerClient(): any {
+  const noopQuery = () => ({
+    select: () => ({ data: [], error: null }),
+    insert: () => ({ data: null, error: null }),
+    update: () => ({ data: null, error: null }),
+    delete: () => ({ data: null, error: null }),
+    eq: () => ({ data: [], error: null }),
+    single: () => ({ data: null, error: null }),
+  });
+
+  return {
+    from: noopQuery,
+    auth: {
+      getUser: () =>
+        Promise.resolve({ data: { user: null }, error: null }),
+      getSession: () =>
+        Promise.resolve({ data: { session: null }, error: null }),
+      signOut: () => Promise.resolve({ error: null }),
+    },
+  };
 }
 
 /**

@@ -39,6 +39,7 @@ export default async function BuyerPage({ params }: { params: Promise<{ id: stri
     id: lead.id,
     name: contact?.name || "Unknown",
     status: lead.status || "new",
+    stage: lead.stage || "NEW_LEAD",
     addedDate: formatDate(lead.createdAt),
 
     contact: {

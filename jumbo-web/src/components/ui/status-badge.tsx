@@ -37,6 +37,7 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   proposal_accepted: "positive",
   sold: "positive",
   qualified: "positive",
+  active_visitor: "positive",
 
   // Warning
   pending: "warning",
@@ -50,6 +51,9 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   cataloguing_pending: "warning",
   on_hold: "warning",
   in_progress: "warning",
+  at_risk_lead: "warning",
+  at_risk_visitor: "warning",
+  reactivated: "warning",
 
   // Negative
   lost: "warning",
@@ -59,9 +63,12 @@ const STATUS_VARIANT_MAP: Record<string, StatusVariant> = {
   cancelled: "negative",
   delisted: "negative",
   no_show: "negative",
+  inactive_lead: "negative",
+  inactive_visitor: "negative",
 
   // Info
   new: "info",
+  new_lead: "info",
 
   // Neutral
   draft: "neutral",

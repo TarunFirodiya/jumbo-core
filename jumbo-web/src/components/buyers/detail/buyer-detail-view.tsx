@@ -42,6 +42,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { DetailLayout } from "@/components/shared/detail-layout";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { BuildingMultiSelect } from "@/components/ui/building-multi-select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -71,6 +72,7 @@ export interface BuyerDetail {
   id: string;
   name: string;
   status: string;
+  stage: string;
   addedDate: string;
 
   contact: { mobile: string; email: string; whatsapp: string };
@@ -158,7 +160,6 @@ const buyerFormSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   mobile: z.string().optional(),
   whatsapp: z.string().optional(),
-  status: z.string(),
   locality: z.string().optional(),
   zone: z.string().optional(),
   pipeline: z.boolean(),
@@ -294,7 +295,6 @@ export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: Buy
       email: buyer?.contact?.email || "",
       mobile: buyer?.contact?.mobile || "",
       whatsapp: buyer?.contact?.whatsapp || "",
-      status: buyer?.status || "new",
       locality: buyer?.locality || "",
       zone: buyer?.zone || "",
       pipeline: buyer?.pipeline ?? false,
@@ -325,7 +325,6 @@ export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: Buy
         email: data.email,
         mobile: data.mobile,
         whatsapp: data.whatsapp,
-        status: data.status,
         locality: data.locality,
         zone: data.zone,
         pipeline: data.pipeline,
@@ -410,29 +409,10 @@ export function BuyerDetailView({ buyer, id, agentId, tasks: initialTasks }: Buy
           <div className="border-t p-4 bg-muted/20">
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Status</div>
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <SelectTrigger className="h-8 mt-1">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">New</SelectItem>
-                            <SelectItem value="contacted">Contacted</SelectItem>
-                            <SelectItem value="active_visitor">Active Visitor</SelectItem>
-                            <SelectItem value="at_risk">At Risk</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Stage</div>
+                <div className="mt-1.5">
+                  <StatusBadge status={buyer.stage} />
+                </div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Agent</div>

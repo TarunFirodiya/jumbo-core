@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/api-helpers";
 import { createVisitRequestSchema } from "@/lib/validations/visit";
 import * as visitService from "@/services/visit.service";
+import * as lifecycleService from "@/services/lead-lifecycle.service";
 
 export const GET = withAuth(
   async (request: NextRequest, { profile }) => {
@@ -83,6 +84,13 @@ export const POST = withAuth<{ data: unknown } | { error: string; details?: unkn
         tourId: validatedData.tourId || null,
         status: "scheduled",
       });
+
+      // Transition lead to ACTIVE_VISITOR on visit creation
+      if (validatedData.leadId) {
+        lifecycleService.onVisitCreated(validatedData.leadId).catch((err) =>
+          console.error("Failed to update lifecycle stage on visit creation:", err)
+        );
+      }
 
       return NextResponse.json({ data: visit }, { status: 201 });
     } catch (error) {

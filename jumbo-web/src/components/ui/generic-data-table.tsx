@@ -264,6 +264,22 @@ export function GenericDataTable<TData, TValue>({
   const hasToolbar = !!searchPlaceholder || (filters && filters.length > 0);
   const selectedCount = selectedRows.length;
 
+  // Defer interactive rendering to avoid Radix ID hydration mismatches
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full space-y-3">
+        <div className="rounded-lg border overflow-hidden">
+          <div className="flex items-center justify-center h-48">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-3">
       {/* ── Toolbar ── */}
