@@ -1,6 +1,8 @@
 import { VisitsPageContent } from "@/components/visits/visits-page-content";
 import * as visitService from "@/services/visit.service";
 
+export const dynamic = "force-dynamic";
+
 // Type matching the API response format
 export type VisitFormatted = {
   id: string;

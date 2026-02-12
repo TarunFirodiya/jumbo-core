@@ -1,5 +1,7 @@
 import { ListingsPageContent } from "@/components/listings/listings-page-content";
 import * as listingService from "@/services/listing.service";
+
+export const dynamic = "force-dynamic";
 import type { ListingWithRelations } from "@/types";
 import { startOfMonth } from "date-fns";
 

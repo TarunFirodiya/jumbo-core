@@ -1,5 +1,7 @@
 import * as visitService from "@/services/visit.service";
 import { VisitDetailView } from "@/components/visits/detail/visit-detail-view";
+
+export const dynamic = "force-dynamic";
 import type { VisitDetailData } from "@/components/visits/detail/visit-detail-view";
 
 export default async function VisitPage({

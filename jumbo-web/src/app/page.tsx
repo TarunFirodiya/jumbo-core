@@ -3,6 +3,8 @@ import { DashboardHeader } from "@/components/dashboard/header";
 import { DashboardContent } from "@/components/dashboard/content";
 import { SidebarProvider } from "@/components/ui/sidebar";
 
+export const dynamic = "force-dynamic";
+
 export default function DashboardPage() {
   return (
     <SidebarProvider className="bg-sidebar">

@@ -1,5 +1,7 @@
 import { BuyersPageContent } from "@/components/buyers/buyers-page-content";
 import * as leadService from "@/services/lead.service";
+
+export const dynamic = "force-dynamic";
 import type { LeadWithRelations } from "@/types";
 
 export default async function BuyersPage({

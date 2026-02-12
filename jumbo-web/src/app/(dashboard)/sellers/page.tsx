@@ -1,5 +1,7 @@
 import { SellersPageContent } from "@/components/sellers/sellers-page-content";
 import * as sellerLeadService from "@/services/seller-lead.service";
+
+export const dynamic = "force-dynamic";
 import type { SellerStats } from "@/types";
 
 export default async function SellersPage({
