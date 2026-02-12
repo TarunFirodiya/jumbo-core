@@ -4,8 +4,8 @@
  */
 
 import { db } from "@/lib/db";
-import { leads, visits, offers, listings } from "@/lib/db/schema";
-import { eq, and, sql, gte, lte, isNull } from "drizzle-orm";
+import { leads, visits, offers, listings, sellerLeads, tasks, visitTours, notifications } from "@/lib/db/schema";
+import { eq, and, sql, gte, lte, isNull, desc, asc, or } from "drizzle-orm";
 
 type DateFilter = "yesterday" | "this_week" | "last_week" | "this_month" | "last_3_months";
 
@@ -178,7 +178,7 @@ export async function getDashboardStats(
       .from(listings)
       .where(
         and(
-          eq(listings.status, "active"),
+          eq(listings.status, "live"),
           gte(listings.publishedAt, startDate),
           lte(listings.publishedAt, endDate),
           isNull(listings.deletedAt)
@@ -254,5 +254,256 @@ export async function getDashboardStatsMulti(
       homesAdded: homesPrevious.homesAdded,
     },
   };
+}
+
+// ============================================
+// ROLE-SPECIFIC DASHBOARD STATS
+// ============================================
+
+/**
+ * Buyer Agent dashboard stats
+ */
+export async function getBuyerAgentStats(agentId: string) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  const [
+    newLeadsResult,
+    activeDealsResult,
+    visitsScheduledResult,
+    pipelineResult,
+    todayFollowUpsResult,
+  ] = await Promise.all([
+    // New leads assigned this month
+    db.select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(and(
+        eq(leads.assignedAgentId, agentId),
+        gte(leads.createdAt, startOfMonth),
+        isNull(leads.deletedAt)
+      )),
+
+    // Active deals (leads with status 'active_visitor' or 'contacted')
+    db.select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(and(
+        eq(leads.assignedAgentId, agentId),
+        or(eq(leads.status, "active_visitor"), eq(leads.status, "contacted")),
+        isNull(leads.deletedAt)
+      )),
+
+    // Visits scheduled (future or today, not completed/cancelled)
+    db.select({ count: sql<number>`count(*)` })
+      .from(visits)
+      .where(and(
+        gte(visits.scheduledAt, startOfDay),
+        eq(visits.status, "scheduled"),
+      )),
+
+    // Pipeline breakdown by status
+    db.select({
+      status: leads.status,
+      count: sql<number>`count(*)`,
+    })
+      .from(leads)
+      .where(and(
+        eq(leads.assignedAgentId, agentId),
+        isNull(leads.deletedAt)
+      ))
+      .groupBy(leads.status),
+
+    // Today's follow-ups (leads with follow-up activities today)
+    db.select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(and(
+        eq(leads.assignedAgentId, agentId),
+        gte(leads.lastContactedAt, startOfDay),
+        lte(leads.lastContactedAt, endOfDay),
+        isNull(leads.deletedAt)
+      )),
+  ]);
+
+  return {
+    newLeads: Number(newLeadsResult[0]?.count ?? 0),
+    activeDeals: Number(activeDealsResult[0]?.count ?? 0),
+    visitsScheduled: Number(visitsScheduledResult[0]?.count ?? 0),
+    pipeline: pipelineResult.map(r => ({ status: r.status, count: Number(r.count) })),
+    todayFollowUps: Number(todayFollowUpsResult[0]?.count ?? 0),
+  };
+}
+
+/**
+ * Listing Agent dashboard stats
+ */
+export async function getListingAgentStats(agentId: string) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [
+    newSellerLeadsResult,
+    pendingInspectionsResult,
+    draftListingsResult,
+    cataloguePendingResult,
+  ] = await Promise.all([
+    // New seller leads assigned this month
+    db.select({ count: sql<number>`count(*)` })
+      .from(sellerLeads)
+      .where(and(
+        eq(sellerLeads.assignedToId, agentId),
+        eq(sellerLeads.status, "new"),
+        isNull(sellerLeads.deletedAt)
+      )),
+
+    // Listings with inspection_pending status
+    db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(and(
+        eq(listings.listingAgentId, agentId),
+        eq(listings.status, "inspection_pending"),
+        isNull(listings.deletedAt)
+      )),
+
+    // Draft listings
+    db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(and(
+        eq(listings.listingAgentId, agentId),
+        eq(listings.status, "draft"),
+        isNull(listings.deletedAt)
+      )),
+
+    // Catalogue pending
+    db.select({ count: sql<number>`count(*)` })
+      .from(listings)
+      .where(and(
+        eq(listings.listingAgentId, agentId),
+        eq(listings.status, "catalogue_pending"),
+        isNull(listings.deletedAt)
+      )),
+  ]);
+
+  return {
+    newSellerLeads: Number(newSellerLeadsResult[0]?.count ?? 0),
+    pendingInspections: Number(pendingInspectionsResult[0]?.count ?? 0),
+    draftListings: Number(draftListingsResult[0]?.count ?? 0),
+    cataloguePending: Number(cataloguePendingResult[0]?.count ?? 0),
+  };
+}
+
+/**
+ * Field Agent (visit_agent) dashboard stats
+ */
+export async function getFieldAgentStats(agentId: string) {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+  const todayStr = startOfDay.toISOString().split("T")[0];
+
+  const [
+    todayVisitsResult,
+    completedTodayResult,
+    todayToursResult,
+  ] = await Promise.all([
+    // Today's visits assigned to this agent
+    db.select({ count: sql<number>`count(*)` })
+      .from(visits)
+      .where(and(
+        eq(visits.assignedVaId, agentId),
+        gte(visits.scheduledAt, startOfDay),
+        lte(visits.scheduledAt, endOfDay),
+      )),
+
+    // Completed today
+    db.select({ count: sql<number>`count(*)` })
+      .from(visits)
+      .where(and(
+        eq(visits.assignedVaId, agentId),
+        eq(visits.status, "completed"),
+        gte(visits.completedAt, startOfDay),
+        lte(visits.completedAt, endOfDay),
+      )),
+
+    // Today's tours for this agent
+    db.select({ count: sql<number>`count(*)` })
+      .from(visitTours)
+      .where(and(
+        eq(visitTours.fieldAgentId, agentId),
+        eq(visitTours.tourDate, todayStr),
+        isNull(visitTours.deletedAt),
+      )),
+  ]);
+
+  return {
+    todayVisits: Number(todayVisitsResult[0]?.count ?? 0),
+    completedToday: Number(completedTodayResult[0]?.count ?? 0),
+    todayTours: Number(todayToursResult[0]?.count ?? 0),
+    pendingToday: Number(todayVisitsResult[0]?.count ?? 0) - Number(completedTodayResult[0]?.count ?? 0),
+  };
+}
+
+/**
+ * Get today's visit schedule for a field agent
+ */
+export async function getFieldAgentSchedule(agentId: string) {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  return db.query.visits.findMany({
+    where: and(
+      eq(visits.assignedVaId, agentId),
+      gte(visits.scheduledAt, startOfDay),
+      lte(visits.scheduledAt, endOfDay),
+    ),
+    with: {
+      lead: true,
+      listing: true,
+    },
+    orderBy: [asc(visits.scheduledAt)],
+  });
+}
+
+/**
+ * Get tasks assigned to a user, sorted by due date (overdue first)
+ */
+export async function getTasksByAssignee(assigneeId: string, limit = 10) {
+  return db.query.tasks.findMany({
+    where: and(
+      eq(tasks.assigneeId, assigneeId),
+      isNull(tasks.deletedAt),
+      sql`${tasks.status} != 'completed'`,
+    ),
+    orderBy: [asc(tasks.dueAt), desc(tasks.createdAt)],
+    limit,
+    with: {
+      creator: true,
+    },
+  });
+}
+
+/**
+ * Get recent notifications for a user
+ */
+export async function getUserNotifications(userId: string, limit = 10) {
+  return db.query.notifications.findMany({
+    where: eq(notifications.userId, userId),
+    orderBy: [desc(notifications.createdAt)],
+    limit,
+  });
+}
+
+/**
+ * Get unread notification count
+ */
+export async function getUnreadNotificationCount(userId: string) {
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(notifications)
+    .where(and(
+      eq(notifications.userId, userId),
+      eq(notifications.isRead, false),
+    ));
+  return Number(result[0]?.count ?? 0);
 }
 

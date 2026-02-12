@@ -2,12 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DataTable } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  GenericDataTable,
+  SortableHeader,
+} from "@/components/ui/generic-data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Eye, Pencil, Trash2, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,46 +29,89 @@ interface BuyersTableProps {
   };
 }
 
+const leadStatusOptions = [
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "qualified", label: "Qualified" },
+  { value: "negotiation", label: "Negotiation" },
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+];
+
 export const columns: ColumnDef<LeadWithRelations>[] = [
   {
     id: "contact.name",
-    accessorKey: "contact.name",
-    header: "Buyer Name",
+    accessorFn: (row) => row.contact?.name ?? "",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Name</SortableHeader>
+    ),
     cell: ({ row }) => (
-      <Link href={`/buyers/${row.original.id}`} className="font-medium truncate hover:underline block">
+      <Link
+        href={`/buyers/${row.original.id}`}
+        className="font-medium text-sm truncate hover:underline block max-w-[200px]"
+      >
         {row.original.contact?.name || "Unknown"}
       </Link>
-    ),
-  },
-  {
-    accessorKey: "contact.email",
-    header: "Email",
-    cell: ({ row }) => <div className="text-muted-foreground truncate">{row.original.contact?.email || "-"}</div>,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 font-medium text-xs whitespace-nowrap">
-        {row.getValue("status")}
-      </Badge>
     ),
   },
   {
     id: "budget",
     header: "Budget",
     cell: ({ row }) => {
-      const req = row.original.requirementJson as any;
+      const req = row.original.requirementJson as {
+        budget_min?: number;
+        budget_max?: number;
+      } | null;
       if (req?.budget_min && req?.budget_max) {
-        return <div className="text-muted-foreground tabular-nums text-center">{`${(req.budget_min / 100000).toFixed(1)}L - ${(req.budget_max / 100000).toFixed(1)}L`}</div>;
+        return (
+          <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">
+            {(req.budget_min / 100000).toFixed(1)}L – {(req.budget_max / 100000).toFixed(1)}L
+          </span>
+        );
       }
-      if (req?.budget_min) return <div className="text-muted-foreground tabular-nums text-center">{`> ${(req.budget_min / 100000).toFixed(1)}L`}</div>;
-      if (req?.budget_max) return <div className="text-muted-foreground tabular-nums text-center">{`< ${(req.budget_max / 100000).toFixed(1)}L`}</div>;
-      return <div className="text-muted-foreground tabular-nums text-center">-</div>;
+      if (req?.budget_min)
+        return (
+          <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">
+            &gt; {(req.budget_min / 100000).toFixed(1)}L
+          </span>
+        );
+      if (req?.budget_max)
+        return (
+          <span className="text-muted-foreground tabular-nums text-xs sm:text-sm">
+            &lt; {(req.budget_max / 100000).toFixed(1)}L
+          </span>
+        );
+      return <span className="text-muted-foreground">–</span>;
     },
   },
   {
-    accessorKey: "assignedAgent",
+    id: "localities",
+    header: "Preferred Areas",
+    cell: ({ row }) => {
+      const req = row.original.requirementJson as {
+        localities?: string[];
+      } | null;
+      const localities = req?.localities;
+      if (!localities || localities.length === 0)
+        return <span className="text-muted-foreground text-sm">–</span>;
+      const display = localities.slice(0, 2).join(", ");
+      const extra = localities.length > 2 ? ` +${localities.length - 2}` : "";
+      return (
+        <span className="text-muted-foreground text-xs sm:text-sm truncate block max-w-[180px]" title={localities.join(", ")}>
+          {display}{extra}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => (
+      <SortableHeader column={column}>Status</SortableHeader>
+    ),
+    cell: ({ row }) => <StatusBadge status={row.getValue("status") as string} />,
+  },
+  {
+    id: "agent",
     header: "Agent",
     cell: ({ row }) => {
       const agent = row.original.assignedAgent;
@@ -76,44 +122,62 @@ export const columns: ColumnDef<LeadWithRelations>[] = [
               {agent?.fullName?.substring(0, 2).toUpperCase() || "??"}
             </AvatarFallback>
           </Avatar>
-          <span className="text-muted-foreground text-sm truncate">{agent?.fullName || "Unassigned"}</span>
+          <span className="text-muted-foreground text-xs sm:text-sm truncate max-w-[120px]">
+            {agent?.fullName || "Unassigned"}
+          </span>
         </div>
       );
     },
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/buyers/${row.original.id}`} className="flex items-center">
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Buyer
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
+    enableHiding: false,
+    cell: ({ row }) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link href={`/buyers/${row.original.id}`} className="flex items-center">
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Pencil className="mr-2 h-4 w-4" />
+            Edit Buyer
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
   },
 ];
 
 export function BuyersTable({ data }: BuyersTableProps) {
-  return <DataTable columns={columns} data={data} filterColumn="contact.name" />;
+  return (
+    <GenericDataTable
+      columns={columns}
+      data={data}
+      searchPlaceholder="Search buyers..."
+      filters={[
+        { column: "status", label: "Status", options: leadStatusOptions },
+      ]}
+      enableSelection
+      emptyIcon={
+        <div className="rounded-full bg-muted p-4">
+          <Users className="size-8 text-muted-foreground/60" />
+        </div>
+      }
+      emptyMessage="No buyers found"
+      emptyDescription="Buyers will appear here once leads are created."
+    />
+  );
 }

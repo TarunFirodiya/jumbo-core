@@ -9,10 +9,11 @@ import {
   MarkerContent,
   MarkerLabel,
   MarkerPopup,
+  type MapRef,
 } from "@/components/ui/map";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Navigation, ExternalLink, MapPin } from "lucide-react";
+import { Navigation, MapPin } from "lucide-react";
 import { cn, formatINR } from "@/lib/utils";
 import type { ListingWithRelations } from "@/types";
 
@@ -41,6 +42,8 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 
 interface ListingsMapProps {
   data: ListingWithRelations[];
+  selectedId?: string;
+  onSelectListing?: (id: string) => void;
 }
 
 type MapListing = {
@@ -106,7 +109,8 @@ function calculateMapCenter(listings: MapListing[]): [number, number] {
   return [avgLng, avgLat];
 }
 
-export function ListingsMap({ data }: ListingsMapProps) {
+export function ListingsMap({ data, selectedId, onSelectListing }: ListingsMapProps) {
+  const mapRef = React.useRef<MapRef>(null);
   const mapListings = React.useMemo(() => {
     return data
       .map(transformListingForMap)
@@ -115,9 +119,22 @@ export function ListingsMap({ data }: ListingsMapProps) {
 
   const center = React.useMemo(() => calculateMapCenter(mapListings), [mapListings]);
 
+  // Fly to selected listing when selectedId changes
+  React.useEffect(() => {
+    if (!selectedId || !mapRef.current) return;
+    const listing = mapListings.find((l) => l.id === selectedId);
+    if (listing) {
+      mapRef.current.flyTo({
+        center: [listing.longitude, listing.latitude],
+        zoom: 15,
+        duration: 800,
+      });
+    }
+  }, [selectedId, mapListings]);
+
   if (mapListings.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-380px)] text-center p-8">
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <MapPin className="size-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">No listings with location data</h3>
         <p className="text-muted-foreground">
@@ -128,22 +145,25 @@ export function ListingsMap({ data }: ListingsMapProps) {
   }
 
   return (
-    <div className="h-[calc(100vh-380px)] w-full rounded-lg overflow-hidden border">
-      <Map center={center} zoom={11}>
+    <div className="h-full w-full rounded-lg overflow-hidden border">
+      <Map ref={mapRef} center={center} zoom={11}>
         {mapListings.map((listing) => {
           const statusColor = statusColors[listing.status] || statusColors.draft;
           const statusLabel = statusLabels[listing.status] || listing.status;
+          const isSelected = selectedId === listing.id;
 
           return (
             <MapMarker
               key={listing.id}
               longitude={listing.longitude}
               latitude={listing.latitude}
+              onClick={() => onSelectListing?.(listing.id)}
             >
               <MarkerContent>
                 <div
                   className={cn(
-                    "size-5 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-transform",
+                    "rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-110 transition-all",
+                    isSelected ? "size-7 ring-2 ring-accent-green" : "size-5",
                     statusColor.bg
                   )}
                 />
