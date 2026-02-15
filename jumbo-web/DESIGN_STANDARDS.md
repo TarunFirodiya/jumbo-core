@@ -1,183 +1,109 @@
-# Global Design Standards
+# Global Design Standards (Updated)
 
-This document outlines the design system and coding standards for the application to ensure consistency, maintainability, and a unified look & feel.
-
-## 1. Tech Stack & Core Philosophy
+## 1. Tech Stack
 
 - **Framework**: Next.js 16 (App Router)
-- **Styling Engine**: Tailwind CSS v4
-- **Component Primitives**: Radix UI (Headless, accessible)
-- **Icons**: Lucide React
-- **Theming**: CSS Variables with `next-themes` (Dark/Light mode support)
+- **Styling**: Tailwind CSS v4
+- **Component Primitives**: Radix UI
+- **Theming**: CSS Variables with `next-themes`
 
-**Core Philosophy**:
-- **Accessibility First**: Use Radix UI primitives to ensure keyboard navigation and screen reader support.
-- **Utility-First**: Leverage Tailwind CSS for styling. Avoid writing custom CSS files outside of `globals.css`.
-- **Composition**: Build complex UIs by composing small, single-purpose components.
+## 2. Icons (@hugeicons/react)
 
-## 2. Color System
+**Package**: `@hugeicons/react` (Huge Icons Pro)
 
-We use a semantic color system based on **OKLCH** color space for better perceptual uniformity. Colors are defined as CSS variables in `globals.css`.
-
-### Semantic Tokens
-Instead of hardcoding hex values (e.g., `#000000`), use semantic utility classes:
-
-| Role | Class Prefix | Description |
-|------|--------------|-------------|
-| **Background** | `bg-background` | Page background color |
-| **Foreground** | `text-foreground` | Base text color |
-| **Primary** | `bg-primary`, `text-primary-foreground` | Main actions (e.g., "Submit" buttons) |
-| **Secondary** | `bg-secondary`, `text-secondary-foreground` | Less prominent actions |
-| **Muted** | `bg-muted`, `text-muted-foreground` | Subdued elements (backgrounds, helper text) |
-| **Accent** | `bg-accent`, `text-accent-foreground` | Interactive highlights (hover states, selected items) |
-| **Destructive** | `bg-destructive`, `text-destructive-foreground` | Destructive actions (e.g., "Delete") |
-| **Border** | `border-border` | Default border color |
-| **Input** | `border-input` | Border color for form inputs |
-| **Ring** | `ring-ring` | Focus ring color |
-
-### Charts & Visualization
-Chart colors are defined as `--chart-1` through `--chart-5` to ensure consistent data visualization palettes across the app.
-
-## 3. Typography
-
-We use **Geist** font family via `next/font`.
-
-- **Sans-serif**: `font-sans` (Geist Sans) - Used for UI text, headings, and body.
-- **Monospace**: `font-mono` (Geist Mono) - Used for code blocks, IDs, and tabular data where alignment matters.
-
-**Guidelines**:
-- Use `text-sm` (14px) as the default font size for UI controls.
-- Use `text-muted-foreground` for secondary information to establish visual hierarchy.
-- Use `font-medium` or `font-semibold` for emphasis, avoiding `font-bold` unless necessary for large headings.
-
-## 4. Spacing & Radii
-
-### Spacing
-Follow Tailwind's default spacing scale (multiples of 4px).
-- **Small**: `gap-2` (8px), `p-2` (8px)
-- **Medium**: `gap-4` (16px), `p-4` (16px)
-- **Large**: `gap-6` (24px), `p-6` (24px)
-- **Section**: `gap-8` (32px), `p-8` (32px)
-
-### Border Radius
-We use a variable-based radius system to allow global "roundness" adjustments.
-- **Default**: `rounded-lg` (uses `var(--radius)`)
-- **Small**: `rounded-md`
-- **Large**: `rounded-xl`
-- **Full**: `rounded-full` (for avatars, badges)
-
-## 5. Component Architecture
-
-### UI Components (`src/components/ui`)
-These are low-level, reusable building blocks (Buttons, Inputs, Cards) powered by shadcn/ui.
-- **HARD RULE**: All new UI elements MUST use these pre-built components whenever possible. Do not build custom UI primitives (like modals, dropdowns, or tabs) from scratch.
-- **Do not modify logic**: These should remain purely presentational primitives mostly.
-- **Variants**: Use `class-variance-authority` (cva) to define variants (e.g., `default`, `outline`, `ghost` buttons).
-
-Example `cva` usage:
-```tsx
-const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-md text-sm font-medium...",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-      },
-      size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-      },
-    },
-    defaultVariants: { variant: "default", size: "default" },
-  }
-)
-```
-
-### Feature Components (`src/components/dashboard`, `src/components/listings`)
-These contain business logic and compose UI components.
-- Keep them specific to their domain.
-- Extract generic patterns back to `src/components/ui` if used in multiple places.
-
-### Class Merging
-ALWAYS use the `cn()` utility when accepting a `className` prop to ensure Tailwind classes merge correctly (handling conflicts like `p-4` vs `p-2`).
+**Usage**:
+- Use **Filled** variants for primary actions and active states
+- Use **Stroke** variants for secondary/inactive states
+- **Stroke width**: 1.2px
+- **Base size**: 16px (`size-4`)
 
 ```tsx
-import { cn } from "@/lib/utils"
+import { Home01Icon, User01Icon } from "@hugeicons/react"
 
-export function MyComponent({ className, ...props }) {
-  return <div className={cn("bg-red-500", className)} {...props} />
-}
+// Filled for emphasis
+<Home01Icon variant="filled" className="size-4" />
+
+// Stroke for default
+<User01Icon variant="stroke" className="size-4" />
 ```
 
-## 6. Iconography
+## 3. Typography (2 Weights Only)
 
-Use **Lucide React** for all icons.
-- **Size**: Default to `size-4` (16px) for buttons/inputs, `size-5` or `size-6` for navigation/headers.
-- **Stroke**: Default stroke width is usually sufficient.
-- **Context**: Use `lucide-react` icons directly in components.
+**Font**: Geist (keep existing)
+
+**Rules**:
+- **Regular (400)**: All body text, paragraphs, descriptions
+- **Medium (500)**: Headings, buttons, labels, emphasis
+
+**No bold, no semibold, no light.**
 
 ```tsx
-import { Search } from "lucide-react"
+// Body text
+<p className="text-sm font-normal text-foreground">
 
-<Search className="size-4 text-muted-foreground" />
+// Headings
+<h2 className="text-lg font-medium text-foreground">
+
+// Buttons
+<Button className="font-medium">
 ```
 
-## 7. Motion & Animation
+## 4. Colors (Tailwind Neutral Palette)
 
-- Use `tw-animate-css` for simple enter/exit animations (e.g., `animate-in fade-in`).
-- Use `framer-motion` for complex gestures or layout transitions.
-- Respect `prefers-reduced-motion`.
+**Background**: `bg-neutral-50` (light) / `bg-neutral-950` (dark)
+**Surface**: `bg-white` (light) / `bg-neutral-900` (dark)
+**Border**: `border-neutral-200` (light) / `border-neutral-800` (dark)
+**Text Primary**: `text-neutral-900` (light) / `text-neutral-100` (dark)
+**Text Secondary**: `text-neutral-500`
+**Text Muted**: `text-neutral-400`
 
-## 8. Dark Mode
-- The app supports dark mode via `next-themes`.
-- Ensure all custom colors have a dark mode equivalent in `globals.css`.
-- Avoid hardcoding `bg-white` or `text-black`. Use `bg-background` and `text-foreground`.
+**Accent** (keep minimal):
+- Primary action: `bg-neutral-900 text-white` (light) / `bg-white text-neutral-900` (dark)
+- Destructive: `bg-red-600 text-white`
 
-## 9. Forms
-- **Standard Component**: Use the `Form` component from `src/components/ui/form.tsx`.
-- **Validation**: ALWAYS use `zod` and `react-hook-form` with `@hookform/resolvers/zod`.
-- **Structure**:
-  ```tsx
-  import { useForm } from "react-hook-form"
-  import { zodResolver } from "@hookform/resolvers/zod"
-  import { z } from "zod"
-  import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-  
-  // Define schema
-  const formSchema = z.object({
-    username: z.string().min(2),
-  })
+## 5. Border Radius (8-12px Only)
 
-  export function ProfileForm() {
-    const form = useForm<z.infer<typeof formSchema>>({
-      resolver: zodResolver(formSchema),
-      defaultValues: { username: "" },
-    })
-    
-    function onSubmit(values: z.infer<typeof formSchema>) {
-      console.log(values)
-    }
+- **Small**: `rounded-lg` (8px)
+- **Default**: `rounded-xl` (12px)
+- **Large**: `rounded-2xl` (16px) - use sparingly
+- **Never**: `rounded-md` (6px), `rounded-3xl`, `rounded-full` (except avatars)
 
-    return (
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <FormField
-            control={form.control}
-            name="username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Username</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </form>
-      </Form>
-    )
-  }
-  ```
+## 6. Spacing
 
+Follow Tailwind's 4px scale:
+- `gap-3` (12px) for tight groupings
+- `gap-4` (16px) for standard spacing
+- `p-4` (16px) for card padding
+- `p-6` (24px) for section padding
+
+## 7. Component Patterns
+
+**Cards**:
+```tsx
+<div className="bg-white rounded-xl border border-neutral-200 p-4">
+```
+
+**Buttons**:
+```tsx
+// Primary
+<Button className="bg-neutral-900 text-white rounded-lg font-medium">
+
+// Secondary
+<Button variant="outline" className="border-neutral-200 rounded-lg font-medium">
+
+// Ghost
+<Button variant="ghost" className="text-neutral-500 hover:text-neutral-900 font-normal">
+```
+
+**Inputs**:
+```tsx
+<Input className="rounded-lg border-neutral-200 focus:border-neutral-400" />
+```
+
+## 8. Migration Notes
+
+- Replace all `lucide-react` imports with `@hugeicons/react`
+- Replace `font-semibold` with `font-medium`
+- Replace `font-bold` with `font-medium`
+- Replace `rounded-md` with `rounded-lg`
+- Replace semantic colors (`bg-primary`) with neutral palette

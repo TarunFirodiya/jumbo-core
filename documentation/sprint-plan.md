@@ -55,8 +55,11 @@ Every tab (Buyers, Sellers, Listings, Visits, Offers, Settings) has working list
 
 #### New Features
 - **S1-024** `[WhatsApp] Test Whatsapp Inbox Embed`
+  - **Status:** ✅ Completed (Feb 15)
   - Add a new tab/iframe in the side panel for Kapso Inbox.
   - URL: `https://inbox.kapso.ai/embed/SzaGruLn0IOgxv9FaVAhQEwPUWCRDZOM5JkJSpTGTA4`
+  - Components: `WhatsAppInboxEmbed` (floating) and `WhatsAppInboxTab` (sidebar).
+  - Design: Huge Icons, Tailwind Neutral palette, 2 font weights, 8-12px radius.
   - Priority: High | Estimate: 1 pt
 
 #### Sellers Tab
@@ -137,9 +140,11 @@ Every tab (Buyers, Sellers, Listings, Visits, Offers, Settings) has working list
 
 #### Shared Components
 - **S1-021** `[Shared] Create reusable notes section component`
+  - **Status:** ✅ Completed (Feb 15)
   - Polymorphic: works for leads, seller leads, listings, visits.
   - CRUD: add note, edit, delete.
   - Uses `POST/PUT/DELETE /api/v1/notes`.
+  - Design: Huge Icons, Tailwind Neutral palette, 2 font weights, 8-12px radius.
   - Priority: High | Estimate: 3 pts
 
 - **S1-022** `[Shared] Create activity timeline component`
