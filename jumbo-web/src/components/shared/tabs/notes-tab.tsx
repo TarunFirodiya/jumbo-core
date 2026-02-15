@@ -1,19 +1,25 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, StickyNote, Trash2 } from "lucide-react";
+import {
+  Loader2Icon,
+  Note01Icon,
+  Delete01Icon,
+  PlusSignIcon,
+} from "@hugeicons/react";
 import { format, isToday, isYesterday } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { createNote, deleteNote, getNotesByEntity } from "@/lib/actions";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface NotesTabProps {
   entityType: "lead" | "seller_lead" | "visit" | "listing";
   entityId: string;
+  className?: string;
 }
 
 function formatTimestamp(dateStr: string): string {
@@ -24,11 +30,22 @@ function formatTimestamp(dateStr: string): string {
   return format(date, "MMM d, yyyy 'at' h:mm a");
 }
 
-export function NotesTab({ entityType, entityId }: NotesTabProps) {
+function getInitials(name: string | null | undefined): string {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
   const [notes, setNotes] = React.useState<any[]>([]);
   const [isLoadingNotes, setIsLoadingNotes] = React.useState(true);
   const [noteContent, setNoteContent] = React.useState("");
   const [isCreatingNote, setIsCreatingNote] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   const fetchNotes = React.useCallback(async () => {
     if (!entityId) return;
@@ -57,6 +74,7 @@ export function NotesTab({ entityType, entityId }: NotesTabProps) {
       if (result.success) {
         toast.success("Note added");
         setNoteContent("");
+        setIsExpanded(false);
         await fetchNotes();
       } else {
         toast.error(result.message);
@@ -69,6 +87,7 @@ export function NotesTab({ entityType, entityId }: NotesTabProps) {
   }
 
   async function handleDeleteNote(noteId: string) {
+    if (!confirm("Are you sure you want to delete this note?")) return;
     try {
       const result = await deleteNote(noteId);
       if (result.success) {
@@ -83,76 +102,120 @@ export function NotesTab({ entityType, entityId }: NotesTabProps) {
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="space-y-4">
+    <div className={cn("bg-white rounded-xl border border-neutral-200", className)}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
+        <div className="flex items-center gap-2">
+          <Note01Icon variant="stroke" className="size-4 text-neutral-500" />
+          <h3 className="font-medium text-neutral-900">Notes</h3>
+          <span className="text-sm font-normal text-neutral-500">({notes.length})</span>
+        </div>
+        {!isExpanded && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(true)}
+            className="h-8 gap-1.5 text-neutral-600 hover:text-neutral-900 font-normal"
+          >
+            <PlusSignIcon variant="stroke" className="size-4" />
+            Add note
+          </Button>
+        )}
+      </div>
+
+      {/* Add Note Form */}
+      {isExpanded && (
+        <div className="p-4 border-b border-neutral-200">
           <div className="space-y-3">
             <Textarea
-              placeholder="Add a note..."
-              className="min-h-[100px]"
+              placeholder="Write a note..."
+              className="min-h-[100px] rounded-lg border-neutral-200 focus:border-neutral-400 resize-none"
               value={noteContent}
               onChange={(e) => setNoteContent(e.target.value)}
             />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsExpanded(false);
+                  setNoteContent("");
+                }}
+                className="h-8 font-normal"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 onClick={handleCreateNote}
                 disabled={isCreatingNote || !noteContent.trim()}
+                className="h-8 bg-neutral-900 text-white hover:bg-neutral-800 rounded-lg font-medium"
               >
                 {isCreatingNote ? (
-                  <><Loader2 className="size-4 animate-spin mr-1" /> Adding...</>
+                  <><Loader2Icon className="size-4 animate-spin mr-1" /> Saving...</>
                 ) : (
-                  "Add Note"
+                  "Add note"
                 )}
               </Button>
             </div>
           </div>
-
-          {isLoadingNotes ? (
-            <div className="flex items-center justify-center py-6 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Loading notes...
-            </div>
-          ) : notes.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <StickyNote className="size-12 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No notes yet</p>
-              <p className="text-sm mt-1">Add your first note above.</p>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-4 border-t">
-              {notes.map((note: any) => (
-                <Card key={note.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">
-                            {note.createdBy?.fullName || "Unknown"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {note.createdAt ? formatTimestamp(new Date(note.createdAt).toISOString()) : ""}
-                          </span>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDeleteNote(note.id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Notes List */}
+      <div className="divide-y divide-neutral-100">
+        {isLoadingNotes ? (
+          <div className="flex items-center justify-center py-8 text-neutral-500">
+            <Loader2Icon className="size-5 animate-spin mr-2" />
+            <span className="font-normal">Loading notes...</span>
+          </div>
+        ) : notes.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <Note01Icon variant="stroke" className="size-8 text-neutral-300 mx-auto mb-2" />
+            <p className="text-sm font-normal text-neutral-500">
+              No notes yet. Add one to get started.
+            </p>
+          </div>
+        ) : (
+          notes.map((note: any) => (
+            <div key={note.id} className="px-4 py-3">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Avatar className="size-7 rounded-lg">
+                      <AvatarFallback className="bg-neutral-100 text-neutral-600 text-xs font-medium rounded-lg">
+                        {getInitials(note.createdBy?.fullName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">
+                        {note.createdBy?.fullName || "Unknown"}
+                      </p>
+                      <p className="text-xs font-normal text-neutral-400">
+                        {note.createdAt ? formatTimestamp(new Date(note.createdAt).toISOString()) : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteNote(note.id)}
+                    className="h-7 w-7 p-0 text-neutral-400 hover:text-red-600"
+                  >
+                    <Delete01Icon variant="stroke" className="size-4" />
+                  </Button>
+                </div>
+                <p className="text-sm font-normal text-neutral-700 whitespace-pre-wrap">
+                  {note.content}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   );
 }

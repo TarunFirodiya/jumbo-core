@@ -1,6 +1,7 @@
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { WhatsAppInboxEmbed } from "@/components/shared/whatsapp-inbox-embed";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
           </main>
         </div>
       </div>
+      <WhatsAppInboxEmbed />
     </SidebarProvider>
   );
 }
