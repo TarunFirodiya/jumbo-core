@@ -1238,7 +1238,15 @@ export async function createNote(
       changes: computeChanges(null, validatedData),
     });
 
-    revalidatePath(`/${entityType}s/${entityId}`);
+    // Map entity type to URL path
+    const pathMap: Record<string, string> = {
+      lead: "buyers",
+      seller_lead: "sellers",
+      listing: "listings",
+      visit: "visits",
+    };
+    const path = pathMap[entityType] || `${entityType}s`;
+    revalidatePath(`/${path}/${entityId}`);
     return {
       success: true,
       data: { id: note.id },
@@ -1292,7 +1300,15 @@ export async function updateNote(
       changes: computeChanges(existingNote as Record<string, unknown>, { content: validatedData.content }),
     });
 
-    revalidatePath(`/${existingNote.entityType}s/${existingNote.entityId}`);
+    // Map entity type to URL path
+    const pathMap: Record<string, string> = {
+      lead: "buyers",
+      seller_lead: "sellers",
+      listing: "listings",
+      visit: "visits",
+    };
+    const path = pathMap[existingNote.entityType] || `${existingNote.entityType}s`;
+    revalidatePath(`/${path}/${existingNote.entityId}`);
     return {
       success: true,
       message: "Note updated successfully",
@@ -1341,7 +1357,15 @@ export async function deleteNote(noteId: string): Promise<ActionResult> {
       changes: null,
     });
 
-    revalidatePath(`/${existingNote.entityType}s/${existingNote.entityId}`);
+    // Map entity type to URL path
+    const pathMap: Record<string, string> = {
+      lead: "buyers",
+      seller_lead: "sellers",
+      listing: "listings",
+      visit: "visits",
+    };
+    const path = pathMap[existingNote.entityType] || `${existingNote.entityType}s`;
+    revalidatePath(`/${path}/${existingNote.entityId}`);
     return {
       success: true,
       message: "Note deleted successfully",
