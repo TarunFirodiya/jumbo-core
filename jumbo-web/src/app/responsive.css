@@ -1,0 +1,72 @@
+/* Mobile-first responsive utilities */
+
+/* Container queries for component-level responsiveness */
+@container (max-width: 640px) {
+  .mobile-stack {
+    flex-direction: column;
+  }
+  
+  .mobile-full-width {
+    width: 100%;
+  }
+  
+  .mobile-hide {
+    display: none;
+  }
+}
+
+/* Table responsiveness */
+.table-mobile-container {
+  @apply w-full overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0;
+}
+
+.table-mobile-wrapper {
+  @apply min-w-[600px] sm:min-w-0;
+}
+
+/* Card responsiveness */
+.card-mobile {
+  @apply rounded-none sm:rounded-xl border-x-0 sm:border-x;
+}
+
+/* Form responsiveness */
+.form-grid-mobile {
+  @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4;
+}
+
+/* Button responsiveness */
+.btn-mobile-full {
+  @apply w-full sm:w-auto;
+}
+
+/* Text responsiveness */
+.text-mobile-sm {
+  @apply text-xs sm:text-sm;
+}
+
+.text-mobile-base {
+  @apply text-sm sm:text-base;
+}
+
+/* Padding responsiveness */
+.p-mobile {
+  @apply p-3 sm:p-4 md:p-6;
+}
+
+.px-mobile {
+  @apply px-3 sm:px-4 md:px-6;
+}
+
+.py-mobile {
+  @apply py-3 sm:py-4 md:py-6;
+}
+
+/* Gap responsiveness */
+.gap-mobile {
+  @apply gap-3 sm:gap-4 md:gap-6;
+}
+
+/* Stats grid */
+.stats-grid-mobile {
+  @apply grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4;
+}
