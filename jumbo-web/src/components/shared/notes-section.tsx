@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 const createNoteSchema = z.object({
@@ -53,7 +53,6 @@ export function NotesSection({ entityType, entityId, className }: NotesSectionPr
   const [isLoading, setIsLoading] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
-  const { toast } = useToast()
 
   // Fetch notes
   const fetchNotes = useCallback(async () => {
@@ -65,13 +64,9 @@ export function NotesSection({ entityType, entityId, className }: NotesSectionPr
       const data = await response.json()
       setNotes(data.data || [])
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to load notes",
-        variant: "destructive",
-      })
+      toast.error("Failed to load notes")
     }
-  }, [entityType, entityId, toast])
+  }, [entityType, entityId])
 
   // Create note form
   const createForm = useForm<CreateNoteForm>({
@@ -104,17 +99,18 @@ export function NotesSection({ entityType, entityId, className }: NotesSectionPr
       createForm.reset()
       setIsExpanded(false)
       await fetchNotes()
-      toast({ description: "Note added successfully" })
+      toast.success("Note added successfully")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create note",
-        variant: "destructive",
-      })
+      toast.error("Failed to create note")
     } finally {
       setIsLoading(false)
     }
   }
+
+  // Fetch notes on mount
+  useEffect(() => {
+    fetchNotes()
+  }, [fetchNotes])
 
   // Handle update
   const onUpdate = async (noteId: string, data: UpdateNoteForm) => {
@@ -130,13 +126,9 @@ export function NotesSection({ entityType, entityId, className }: NotesSectionPr
 
       setEditingNoteId(null)
       await fetchNotes()
-      toast({ description: "Note updated successfully" })
+      toast.success("Note updated successfully")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update note",
-        variant: "destructive",
-      })
+      toast.error("Failed to update note")
     } finally {
       setIsLoading(false)
     }
@@ -155,13 +147,9 @@ export function NotesSection({ entityType, entityId, className }: NotesSectionPr
       if (!response.ok) throw new Error("Failed to delete note")
 
       await fetchNotes()
-      toast({ description: "Note deleted successfully" })
+      toast.success("Note deleted successfully")
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete note",
-        variant: "destructive",
-      })
+      toast.error("Failed to delete note")
     } finally {
       setIsLoading(false)
     }
