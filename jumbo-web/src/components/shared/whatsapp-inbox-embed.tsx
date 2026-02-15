@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Message01Icon,
-  Expand01Icon,
-  Collapse01Icon,
-} from "@hugeicons/react"
+  SquareArrowExpand01Icon,
+  MenuCollapseIcon,
+} from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -30,7 +31,7 @@ export function WhatsAppInboxEmbed({
           onClick={() => setIsMinimized(false)}
           className="h-12 w-12 rounded-xl bg-green-600 hover:bg-green-700 shadow-lg p-0"
         >
-          <Message01Icon variant="filled" className="size-5 text-white" />
+          <HugeiconsIcon icon={Message01Icon} size={20} className="text-white" variant="solid" />
         </Button>
       </div>
     )
@@ -48,7 +49,7 @@ export function WhatsAppInboxEmbed({
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 bg-neutral-50">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center size-8 rounded-lg bg-green-600">
-            <Message01Icon variant="filled" className="size-4 text-white" />
+            <HugeiconsIcon icon={Message01Icon} size={16} className="text-white" variant="solid" />
           </div>
           <div>
             <h3 className="font-medium text-neutral-900">WhatsApp Inbox</h3>
@@ -64,11 +65,10 @@ export function WhatsAppInboxEmbed({
             onClick={() => setIsExpanded(!isExpanded)}
             className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700"
           >
-            {isExpanded ? (
-              <Collapse01Icon variant="stroke" className="size-4" />
-            ) : (
-              <Expand01Icon variant="stroke" className="size-4" />
-            )}
+            <HugeiconsIcon 
+              icon={isExpanded ? MenuCollapseIcon : SquareArrowExpand01Icon} 
+              size={16} 
+            />
           </Button>
           <Button
             variant="ghost"
@@ -110,7 +110,7 @@ export function WhatsAppInboxTab({
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-200">
         <div className="flex items-center justify-center size-8 rounded-lg bg-green-600">
-          <Message01Icon variant="filled" className="size-4 text-white" />
+          <HugeiconsIcon icon={Message01Icon} size={16} className="text-white" variant="solid" />
         </div>
         <div>
           <h3 className="font-medium text-neutral-900">WhatsApp Inbox</h3>

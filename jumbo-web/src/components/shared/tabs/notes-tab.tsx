@@ -1,12 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Loader2Icon,
   Note01Icon,
   Delete01Icon,
+  Cancel01Icon,
+  Tick01Icon,
   PlusSignIcon,
-} from "@hugeicons/react";
+  Edit01Icon,
+} from "@hugeicons/core-free-icons";
+import { Loader2 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 
 import { Button } from "@/components/ui/button";
@@ -106,7 +110,7 @@ export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
         <div className="flex items-center gap-2">
-          <Note01Icon variant="stroke" className="size-4 text-neutral-500" />
+          <HugeiconsIcon icon={Note01Icon} size={16} className="text-neutral-500" />
           <h3 className="font-medium text-neutral-900">Notes</h3>
           <span className="text-sm font-normal text-neutral-500">({notes.length})</span>
         </div>
@@ -117,7 +121,7 @@ export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
             onClick={() => setIsExpanded(true)}
             className="h-8 gap-1.5 text-neutral-600 hover:text-neutral-900 font-normal"
           >
-            <PlusSignIcon variant="stroke" className="size-4" />
+            <HugeiconsIcon icon={PlusSignIcon} size={16} />
             Add note
           </Button>
         )}
@@ -154,7 +158,7 @@ export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
                 className="h-8 bg-neutral-900 text-white hover:bg-neutral-800 rounded-lg font-medium"
               >
                 {isCreatingNote ? (
-                  <><Loader2Icon className="size-4 animate-spin mr-1" /> Saving...</>
+                  <><Loader2 className="size-4 animate-spin mr-1" /> Saving...</>
                 ) : (
                   "Add note"
                 )}
@@ -168,12 +172,12 @@ export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
       <div className="divide-y divide-neutral-100">
         {isLoadingNotes ? (
           <div className="flex items-center justify-center py-8 text-neutral-500">
-            <Loader2Icon className="size-5 animate-spin mr-2" />
+            <Loader2 className="size-5 animate-spin mr-2" />
             <span className="font-normal">Loading notes...</span>
           </div>
         ) : notes.length === 0 ? (
           <div className="px-4 py-8 text-center">
-            <Note01Icon variant="stroke" className="size-8 text-neutral-300 mx-auto mb-2" />
+            <HugeiconsIcon icon={Note01Icon} size={32} className="text-neutral-300 mx-auto mb-2" />
             <p className="text-sm font-normal text-neutral-500">
               No notes yet. Add one to get started.
             </p>
@@ -205,7 +209,7 @@ export function NotesTab({ entityType, entityId, className }: NotesTabProps) {
                     onClick={() => handleDeleteNote(note.id)}
                     className="h-7 w-7 p-0 text-neutral-400 hover:text-red-600"
                   >
-                    <Delete01Icon variant="stroke" className="size-4" />
+                    <HugeiconsIcon icon={Delete01Icon} size={16} />
                   </Button>
                 </div>
                 <p className="text-sm font-normal text-neutral-700 whitespace-pre-wrap">
